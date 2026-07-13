@@ -1,0 +1,35 @@
+name = "EquilibriumPropagation"
+uuid = "5f68fc10-9f8b-4f9a-a08a-3d2f5c2d3b86"
+version = "0.1.0"
+authors = ["EquilibriumPropagation.jl contributors"]
+
+[deps]
+ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
+CommonSolve = "38540f10-b2f7-11e9-35d8-d573e4eb0ff2"
+DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
+Functors = "d9f16b24-f501-4c13-a1f2-28368ffc5196"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+
+[compat]
+ADTypes = "1.22.2"
+CommonSolve = "0.2.11"
+DifferentiationInterface = "0.7.20"
+Functors = "0.5.2"
+Optimisers = "0.4"
+julia = "1.10"
+
+[weakdeps]
+Optimisers = "3bd65402-5787-11e9-1adc-39752487f4e2"
+
+[extensions]
+EquilibriumPropagationOptimisersExt = "Optimisers"
+
+[extras]
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+Optimisers = "3bd65402-5787-11e9-1adc-39752487f4e2"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["ForwardDiff", "Optimisers", "Printf", "Random", "Test"]
