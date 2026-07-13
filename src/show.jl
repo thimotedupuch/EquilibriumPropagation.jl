@@ -22,6 +22,12 @@ function Base.show(io::IO, protocol::SymmetricEP)
     return print(io, ')')
 end
 
+function Base.show(io::IO, protocol::HolomorphicEP)
+    print(io, "HolomorphicEP(")
+    _show_compact(io, protocol.radius)
+    return print(io, "; points=", protocol.points, ')')
+end
+
 function Base.show(io::IO, solver::Relaxation)
     print(io, "Relaxation(dt=")
     _show_compact(io, solver.dt)
@@ -32,9 +38,83 @@ function Base.show(io::IO, solver::Relaxation)
     return print(io, ')')
 end
 
+function Base.show(io::IO, solver::ODERelaxation)
+    print(io, "ODERelaxation(")
+    _show_compact(io, solver.algorithm)
+    print(io, "; tspan=")
+    _show_compact(io, solver.tspan)
+    print(io, ", abstol=")
+    _show_compact(io, solver.abstol)
+    print(io, ", reltol=")
+    _show_compact(io, solver.reltol)
+    return print(io, ')')
+end
+
+function Base.show(io::IO, solver::SteadyStateRelaxation)
+    print(io, "SteadyStateRelaxation(")
+    _show_compact(io, solver.algorithm)
+    print(io, "; tspan=")
+    _show_compact(io, solver.tspan)
+    print(io, ", abstol=")
+    _show_compact(io, solver.abstol)
+    print(io, ", reltol=")
+    _show_compact(io, solver.reltol)
+    return print(io, ')')
+end
+
+function Base.show(io::IO, solver::RootRelaxation)
+    print(io, "RootRelaxation(")
+    _show_compact(io, solver.algorithm)
+    print(io, "; abstol=")
+    _show_compact(io, solver.abstol)
+    print(io, ", reltol=")
+    _show_compact(io, solver.reltol)
+    return print(io, ')')
+end
+
+function Base.show(io::IO, algorithm::ContinuousEP)
+    print(io, "ContinuousEP(")
+    _show_compact(io, algorithm.β)
+    print(io, ", ")
+    _show_compact(io, algorithm.nudged_solver)
+    print(io, "; parameter_abstol=")
+    _show_compact(io, algorithm.parameter_abstol)
+    print(io, ", parameter_reltol=")
+    _show_compact(io, algorithm.parameter_reltol)
+    return print(io, ')')
+end
+
+function Base.show(io::IO, algorithm::AsymEP)
+    print(io, "AsymEP(")
+    _show_compact(io, algorithm.β)
+    print(io, ", ")
+    _show_compact(io, algorithm.solver)
+    return print(io, ')')
+end
+
+function Base.show(io::IO, algorithm::DyadicEP)
+    print(io, "DyadicEP(")
+    _show_compact(io, algorithm.β)
+    print(io, ", ")
+    _show_compact(io, algorithm.solver)
+    return print(io, ')')
+end
+
 function Base.show(io::IO, model::EPModel)
     print(io, "EPModel(energy=")
     _show_compact(io, model.energy)
+    print(io, ", cost=")
+    _show_compact(io, model.cost)
+    print(io, ", readout=")
+    _show_compact(io, model.readout)
+    print(io, ", initial_state=")
+    _show_compact(io, model.initial_state)
+    return print(io, ')')
+end
+
+function Base.show(io::IO, model::DynamicalModel)
+    print(io, "DynamicalModel(dynamics=")
+    _show_compact(io, model.dynamics)
     print(io, ", cost=")
     _show_compact(io, model.cost)
     print(io, ", readout=")
@@ -112,6 +192,34 @@ function Base.show(io::IO, stats::EPStats)
     return print(io, ", converged=", stats.converged, ')')
 end
 
+function Base.show(io::IO, stats::ContinuousEPStats)
+    print(io, "ContinuousEPStats(iterations=", stats.iterations, ", residual=")
+    _show_compact(io, stats.residual)
+    print(io, ", parameter_motion=")
+    _show_compact(io, stats.parameter_motion)
+    return print(io, ", converged=", stats.converged, ')')
+end
+
+function Base.show(io::IO, stats::NonConservativeStats)
+    print(io, "NonConservativeStats(method=")
+    _show_compact(io, stats.method)
+    print(io, ", loss=")
+    _show_compact(io, stats.loss)
+    print(io, ", gradient_norm=")
+    _show_compact(io, stats.gradient_norm)
+    return print(io, ", converged=", stats.converged, ')')
+end
+
+function Base.show(io::IO, stats::HolomorphicEPStats)
+    print(io, "HolomorphicEPStats(loss=")
+    _show_compact(io, stats.loss)
+    print(io, ", gradient_norm=")
+    _show_compact(io, stats.gradient_norm)
+    print(io, ", imaginary_leakage=")
+    _show_compact(io, stats.imaginary_leakage)
+    return print(io, ", converged=", stats.converged, ')')
+end
+
 function _show_property(io::IO, label, value)
     print(io, label, ": ")
     _show_compact(io, value)
@@ -121,6 +229,14 @@ end
 function Base.show(io::IO, ::MIME"text/plain", model::EPModel)
     print(io, "EPModel")
     _show_property(io, "\n  energy", model.energy)
+    _show_property(io, "\n  cost", model.cost)
+    _show_property(io, "\n  readout", model.readout)
+    _show_property(io, "\n  initial_state", model.initial_state)
+end
+
+function Base.show(io::IO, ::MIME"text/plain", model::DynamicalModel)
+    print(io, "DynamicalModel")
+    _show_property(io, "\n  dynamics", model.dynamics)
     _show_property(io, "\n  cost", model.cost)
     _show_property(io, "\n  readout", model.readout)
     _show_property(io, "\n  initial_state", model.initial_state)

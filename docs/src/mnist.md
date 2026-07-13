@@ -1,7 +1,8 @@
 # MNIST classification example
 
 The repository includes `examples/mnist_classification.jl`, a compact MNIST
-classifier trained with symmetric equilibrium propagation. Images are hard-clamped
+classifier trained with symmetric equilibrium propagation. It is constructed with
+`ContinuousHopfield((nfeatures, 10); activation=identity)`. Images are hard-clamped
 external inputs and the ten class-score neurons form the relaxed dynamical state.
 
 To keep ForwardDiff-based parameter gradients practical, the script average-pools

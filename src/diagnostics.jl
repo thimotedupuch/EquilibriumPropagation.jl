@@ -3,8 +3,11 @@ _missing_iterations(solution) = solution === nothing ? missing : solution.iterat
 _missing_energy(solution) = solution === nothing ? missing : solution.energy
 
 function _tree_norm(tree)
-    total = sum(fcollect(tree); init=0) do leaf
-        leaf isa Number ? abs2(leaf) : sum(abs2, leaf)
+    total = sum(fleaves(tree); init=0) do leaf
+        if leaf isa Tuple{}
+            return 0
+        end
+        return leaf isa Number ? abs2(leaf) : sum(abs2, leaf)
     end
     return sqrt(total)
 end

@@ -57,44 +57,21 @@ function load_mnist(; train_samples=1_000, test_samples=500, pool=4, seed=7)
     )
 end
 
-struct MNISTLayout
-    ninput::Int
-    noutput::Int
-end
-
-function unpack_mnist(parameters, layout::MNISTLayout)
-    weights_stop = layout.ninput * layout.noutput
-    weights = reshape(view(parameters, 1:weights_stop), layout.noutput, layout.ninput)
-    bias = view(parameters, (weights_stop + 1):length(parameters))
-    return weights, bias
-end
-
-function initialize_mnist_parameters(rng::AbstractRNG, layout::MNISTLayout)
-    weights = 0.05f0 .* randn(rng, Float32, layout.noutput, layout.ninput)
-    bias = zeros(Float32, layout.noutput)
-    return [vec(weights); bias]
-end
-
 """
 Construct a quadratic energy-based classifier.
 
 Images are fixed external inputs. The ten output neurons are the dynamical state
-relaxed by EP, and their free equilibrium contains the class scores.
+relaxed by EP, and their free equilibrium contains the class scores. This uses the
+same [`ContinuousHopfield`](@ref) builder as deeper networks, with identity activation
+to make the classifier linear.
 """
-function mnist_classifier(layout::MNISTLayout)
-    function energy(state, parameters, input, model_state)
-        weights, bias = unpack_mnist(parameters, layout)
-        drive = weights * input .+ reshape(bias, :, 1)
-        return (sum(abs2, state) / 2 - sum(state .* drive)) / size(input, 2)
-    end
-
-    return EPModel(
-        energy=energy,
-        cost=(state, target, parameters, model_state) ->
-            sum(abs2, state .- target) / (2 * size(target, 2)),
-        readout=(state, parameters, model_state) -> state,
-        initial_state=(parameters, input, model_state) ->
-            zeros(eltype(parameters), layout.noutput, size(input, 2)),
+function mnist_classifier(ninput::Integer)
+    weight_initializer = (rng, rows, columns) ->
+        0.05f0 .* randn(rng, Float32, rows, columns)
+    return ContinuousHopfield(
+        (ninput, 10);
+        activation=identity,
+        weight_initializer,
     )
 end
 
@@ -151,9 +128,8 @@ function train_mnist(
     rng = Xoshiro(seed)
     train_inputs, train_targets, train_labels, test_inputs, _, test_labels =
         load_mnist(; train_samples, test_samples, pool, seed)
-    layout = MNISTLayout(size(train_inputs, 1), 10)
-    model = mnist_classifier(layout)
-    parameters = initialize_mnist_parameters(rng, layout)
+    network = mnist_classifier(size(train_inputs, 1))
+    model, parameters = EquilibriumPropagation.setup(rng, network)
     state_ad = AutoForwardDiff()
     algorithm = EPAlgorithm(
         SymmetricEP(0.1f0),
@@ -166,7 +142,7 @@ function train_mnist(
     initial_accuracy = mnist_accuracy(
         model, parameters, test_inputs, test_labels, state_ad; batch_size,
     )
-    @printf "MNIST EP classifier: %d pooled pixels -> 10 outputs\n" layout.ninput
+    @printf "MNIST EP classifier: %d pooled pixels -> 10 outputs\n" size(train_inputs, 1)
     @printf "initial test accuracy: %5.1f%%\n" (100 * initial_accuracy)
 
     for epoch in 1:epochs
@@ -212,7 +188,7 @@ function train_mnist(
     final_accuracy = mnist_accuracy(
         model, parameters, test_inputs, test_labels, state_ad; batch_size,
     )
-    return (; model, parameters, layout, accuracy=final_accuracy)
+    return (; model, parameters, network, accuracy=final_accuracy)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

@@ -42,3 +42,34 @@ end
 function CommonSolve.solve(problem::EPProblem, algorithm::Relaxation; state_ad, kwargs...)
     return equilibrate(problem, FreePhase(), algorithm; state_ad, kwargs...)
 end
+
+
+function CommonSolve.solve(
+    problem::EPProblem,
+    algorithm::AbstractEquilibriumAlgorithm;
+    state_ad,
+    kwargs...,
+)
+    return equilibrate(problem, FreePhase(), algorithm; state_ad, kwargs...)
+end
+
+function equilibrate(
+    problem::EPProblem,
+    phase::AbstractPhase,
+    algorithm::Union{ODERelaxation,SteadyStateRelaxation,RootRelaxation};
+    kwargs...,
+)
+    return _equilibrate_optional(problem, phase, algorithm; kwargs...)
+end
+
+function _equilibrate_optional(
+    problem::EPProblem,
+    phase::AbstractPhase,
+    algorithm::Union{ODERelaxation,SteadyStateRelaxation,RootRelaxation};
+    kwargs...,
+)
+    throw(ArgumentError(
+        "$(nameof(typeof(algorithm))) requires its optional SciML integration packages; " *
+        "load the package providing $(typeof(algorithm.algorithm)) before solving",
+    ))
+end

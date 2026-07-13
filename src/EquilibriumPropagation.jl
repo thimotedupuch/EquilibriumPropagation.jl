@@ -2,11 +2,13 @@ module EquilibriumPropagation
 
 import CommonSolve
 import ADTypes
-using DifferentiationInterface: check_available, gradient, prepare_gradient
-using Functors: fcollect, fmap
+using DifferentiationInterface: check_available, gradient, jacobian, prepare_gradient
+using Functors: fleaves, fmap
+using LinearAlgebra: Diagonal, diag, dot
 
 include("types.jl")
 include("model_interface.jl")
+include("hopfield.jl")
 include("show.jl")
 include("objectives.jl")
 include("differentiation.jl")
@@ -14,13 +16,49 @@ include("relaxation.jl")
 include("phases.jl")
 include("gradients.jl")
 include("diagnostics.jl")
+include("continuous.jl")
+include("nonconservative.jl")
+include("holomorphic.jl")
 
-export EPModel, EPProblem, EPAlgorithm
-export FreePhase, NudgedPhase, OneSidedEP, SymmetricEP
-export Relaxation, EquilibriumSolution, EPPhases, EPStats
-export energy, cost, readout, initial_state, augmented_energy
+export EPModel, DynamicalModel, EPProblem, EPAlgorithm
+export FreePhase, NudgedPhase, OneSidedEP, SymmetricEP, HolomorphicEP
+export Relaxation, EquilibriumSolution, EPPhases, HolomorphicPhases, EPStats
+export ODERelaxation, SteadyStateRelaxation, RootRelaxation, solver_details
+export ContinuousEP, ContinuousEPStats, continuous_ep, continuous_train_step!
+export AsymEP, DyadicEP, NonConservativeStats
+export HolomorphicEPStats
+export energy, vector_field, cost, readout, initial_state, augmented_energy
+export ContinuousHopfield, QuadraticPotential, HardClamp, BipolarSquaredError
+export ZeroState, GlorotUniform, setup, pack_parameters, unpack_parameters
 export equilibrate, solve_phases, ep_gradient, predict
 export apply_gradient!, train_step!
+export lux_setup, lux_energy_model, lux_dynamical_model
+
+"""
+    lux_setup(rng, layer) -> parameters, model_state
+
+Initialize a Lux layer and place its non-trainable state in test mode for use during
+equilibrium relaxation. Loading Lux.jl activates this function.
+"""
+function lux_setup end
+
+"""
+    lux_energy_model(layer; cost, readout, initial_state, kwargs...)
+
+Adapt a Lux layer that contributes a scalar energy into an [`EPModel`](@ref). Loading
+Lux.jl activates this function. The Lux state must remain unchanged during every
+relaxation evaluation.
+"""
+function lux_energy_model end
+
+"""
+    lux_dynamical_model(layer; cost, readout, initial_state, kwargs...)
+
+Adapt a Lux layer that computes a vector field into a [`DynamicalModel`](@ref).
+Loading Lux.jl activates this function. The Lux state must remain unchanged during
+every relaxation evaluation.
+"""
+function lux_dynamical_model end
 
 """
     apply_gradient!(optimizer_state, parameters, gradients)
@@ -40,5 +78,13 @@ and return `(optimizer_state, parameters, stats)`. Loading Optimisers.jl activat
 these methods.
 """
 function train_step! end
+
+"""
+    continuous_train_step!(optimizer_state, problem, algorithm)
+
+Run [`continuous_ep`](@ref), applying each local parameter gradient through an
+Optimisers.jl state. Loading Optimisers.jl activates this method.
+"""
+function continuous_train_step! end
 
 end

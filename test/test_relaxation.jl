@@ -43,3 +43,33 @@
     )
     @test_throws ArgumentError solve_phases(problem, unavailable)
 end
+
+@testset "optional solver wrappers" begin
+    ode = ODERelaxation(:Tsit5; tspan=(0.0, 20.0), abstol=1e-8, reltol=1e-6, maxiters=50)
+    @test ode.algorithm == :Tsit5
+    @test ode.tspan == (0.0, 20.0)
+    @test ode.kwargs == (maxiters=50,)
+    @test occursin("ODERelaxation", repr(ode))
+
+    steady = SteadyStateRelaxation(:Rodas5P; abstol=1e-9, reltol=1e-7)
+    @test steady.algorithm == :Rodas5P
+    @test steady.tspan == Inf
+    @test occursin("SteadyStateRelaxation", repr(steady))
+
+    root = RootRelaxation(:TrustRegion; abstol=1e-10, reltol=1e-8, maxiters=30)
+    @test root.algorithm == :TrustRegion
+    @test root.kwargs.maxiters == 30
+    @test occursin("RootRelaxation", repr(root))
+
+    @test_throws ArgumentError ODERelaxation(:Tsit5; tspan=(1.0, 0.0))
+    @test_throws ArgumentError ODERelaxation(:Tsit5; abstol=-1.0)
+    @test_throws ArgumentError SteadyStateRelaxation(:Tsit5; tspan=0.0)
+    @test_throws ArgumentError RootRelaxation(:TrustRegion; reltol=-1.0)
+
+    problem = quadratic_problem()[1]
+    @test_throws ArgumentError equilibrate(
+        problem, FreePhase(), ode; state_ad=AutoForwardDiff(),
+    )
+    solution = EquilibriumSolution([1.0], 0.0, 2, true, 0.5, FreePhase(), (retcode=:ok,))
+    @test solver_details(solution) == (retcode=:ok,)
+end

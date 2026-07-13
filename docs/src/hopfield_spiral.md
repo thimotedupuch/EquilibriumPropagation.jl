@@ -3,11 +3,12 @@
 The repository includes `examples/continuous_hopfield_spiral.jl`, a complete
 two-class training example.
 
-The continuous Hopfield state contains hidden and output neurons. Its conservative
-energy combines quadratic neuron potentials with tanh firing rates, input drive,
-hidden–output coupling, and biases. Because all interactions appear in one scalar
-energy, state dynamics are obtained directly from its gradient. Bipolar output targets
-provide the supervised nudging cost.
+The example declares a `ContinuousHopfield((2, hidden, 2))` specification and calls
+`setup` to obtain an ordinary `EPModel` and named parameter tree. The dynamical state
+contains hidden and output neurons. Its conservative energy combines quadratic neuron
+potentials with tanh firing rates, input drive, hidden–output coupling, and biases.
+Because all interactions appear in one scalar energy, state dynamics are obtained
+directly from its gradient. Bipolar output targets provide the supervised nudging cost.
 
 ## Run it
 
@@ -30,7 +31,7 @@ julia --project=examples examples/continuous_hopfield_spiral.jl \
 ```
 
 `points` must be even and divisible by `batch-size`. The script returns the trained
-model, flat parameter vector, data, labels, and final accuracy when `train_spiral` is
+model, named parameter tree, data, labels, and final accuracy when `train_spiral` is
 called programmatically.
 
 ## Why the step scales with batch size

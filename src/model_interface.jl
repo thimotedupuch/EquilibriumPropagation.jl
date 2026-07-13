@@ -15,6 +15,27 @@ struct EPModel{E,C,R,I}
     initial_state::I
 end
 
+"""
+    DynamicalModel(; dynamics, cost, readout, initial_state)
+
+Function-based model for arbitrary differentiable, potentially non-conservative
+dynamics. `dynamics(s, ps, x, st)` returns `ds/dt`; unlike [`EPModel`](@ref), it need
+not derive from a scalar energy. The remaining call signatures match `EPModel`.
+"""
+struct DynamicalModel{D,C,R,I}
+    dynamics::D
+    cost::C
+    readout::R
+    initial_state::I
+end
+
+function DynamicalModel(; dynamics, cost, readout, initial_state=nothing,
+                        initialstate=nothing)
+    init = initial_state === nothing ? initialstate : initial_state
+    init === nothing && throw(ArgumentError("initial_state is required"))
+    return DynamicalModel(dynamics, cost, readout, init)
+end
+
 function EPModel(; energy, cost, readout, initial_state=nothing, initialstate=nothing)
     init = initial_state === nothing ? initialstate : initial_state
     init === nothing && throw(ArgumentError("initial_state is required"))
@@ -49,6 +70,19 @@ readout(model::EPModel, state, parameters, model_state) =
 
 """Construct the initial dynamical state for an equilibrium solve."""
 initial_state(model::EPModel, parameters, model_state, input) =
+    model.initial_state(parameters, input, model_state)
+
+"""Evaluate a [`DynamicalModel`](@ref)'s vector field at `state`."""
+vector_field(model::DynamicalModel, state, parameters, model_state, input) =
+    model.dynamics(state, parameters, input, model_state)
+
+cost(model::DynamicalModel, state, parameters, model_state, target) =
+    model.cost(state, target, parameters, model_state)
+
+readout(model::DynamicalModel, state, parameters, model_state) =
+    model.readout(state, parameters, model_state)
+
+initial_state(model::DynamicalModel, parameters, model_state, input) =
     model.initial_state(parameters, input, model_state)
 
 """

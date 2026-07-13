@@ -8,6 +8,11 @@ propagation for conservative energy-based models, using explicit Euler relaxatio
 
 ### Convenient continuous Hopfield network builders
 
+**Status:** initial implementation complete. `ContinuousHopfield` constructs ordinary
+`EPModel` values with hard-clamped inputs, named parameter trees, dense and optional
+recurrent symmetric couplings, configurable callables and initializers, shape
+validation, and vector/batched execution. The spiral and MNIST examples use this API.
+
 Provide compositional utilities for constructing continuous Hopfield networks without
 requiring users to manually flatten parameters and write the complete scalar energy.
 The API should remain compatible with custom models and should make the following
@@ -112,6 +117,11 @@ should fail at construction or problem setup rather than during relaxation.
 
 ### Continuous EP
 
+**Status:** initial implementation complete. `ContinuousEP` alternates explicit state
+steps with telescoping local parameter-gradient updates, supports nudging and learning
+schedules, provides optimizer-neutral and Optimisers.jl entry points, and records
+state residual and parameter-motion diagnostics with joint stopping criteria.
+
 Add continuous equilibrium propagation, with small continuous parameter updates
 performed during the nudging phase instead of separating equilibrium solving and a
 single parameter update into strictly distinct operations.
@@ -126,6 +136,14 @@ The design will need to specify:
 
 ### AsymEP and Dyadic EP
 
+**Status:** initial implementation complete. `DynamicalModel` gives arbitrary vector
+fields an explicit interface separate from conservative `EPModel`. `AsymEP` implements
+the frozen antisymmetric-Jacobian correction with opposite nudging, while `DyadicEP`
+implements the doubled midpoint/difference dynamics. Both support array-valued states,
+fixed-step `Relaxation`, parameter trees, shared diagnostics, `ep_gradient`, and the
+Optimisers.jl training entry point. Tree-valued states and optional SciML solvers remain
+future extensions.
+
 Add AsymEP and Dyadic EP to support training arbitrary non-conservative dynamical
 systems. An important special case is the ability to train feedforward networks,
 without requiring their dynamics to derive from a scalar energy or their forward and
@@ -135,9 +153,34 @@ These methods should share as much of the existing phase, solver, differentiatio
 and diagnostic infrastructure as possible while making the conservative assumptions
 of classical EP explicit rather than implicit.
 
+### Holomorphic EP
+
+**Status:** initial implementation complete. `HolomorphicEP` samples finite-amplitude
+complex nudges on a circle, relaxes complex equilibria with holomorphic state
+derivatives, and extracts the first Fourier coefficient of the phase parameter
+derivatives. It supports real array or tuple/named-tuple parameter trees, exposes
+imaginary-leakage and convergence diagnostics, and makes the model's holomorphicity a
+documented contract. The built-in quadratic Hopfield potential, squared output cost,
+and recurrent symmetrization avoid conjugating active complex states.
+
+Add Holomorphic EP as a standard conservative EP protocol for reducing the
+finite-nudging bias without requiring the teaching radius to vanish. The public API
+must make its stronger assumptions explicit: the augmented energy and selected
+equilibrium branch must be holomorphic throughout a stable complex neighbourhood.
+Complex conjugation, absolute values, clipping, ReLU-like activations, and other
+non-holomorphic operations are invalid on active state values.
+
 ## Ecosystem extensions
 
 ### Lux extension
+
+**Status:** initial implementation complete. The optional Lux extension provides
+`lux_setup`, `lux_energy_model`, and `lux_dynamical_model`. Lux parameters remain the
+trainable parameter tree, Lux state is converted to test mode and required to remain
+unchanged during relaxation, and caller-supplied input/output maps define the boundary
+between ordinary Lux evaluation and the EP dynamical state. Focused coverage exercises
+Continuous EP, AsymEP, Dyadic EP, Holomorphic EP, Optimisers, test-mode BatchNorm, and
+rejection of state-changing layers.
 
 Add a Lux.jl extension, particularly for Continuous EP, AsymEP, and Dyadic EP. The
 extension should allow Lux models, parameters, and model state to participate in the
@@ -165,6 +208,11 @@ diagnostics.
 ## Equilibrium solvers
 
 ### Relaxation beyond explicit Euler
+
+**Status:** initial optional integrations complete. `ODERelaxation`,
+`SteadyStateRelaxation`, and `RootRelaxation` integrate Tsit5, Rodas5P, DynamicSS, and
+NonlinearSolve algorithms through package extensions while preserving phase warm
+starts and `EquilibriumSolution` reporting.
 
 Add better relaxation algorithms beyond the current fixed-step explicit Euler method.
 Priority directions are:

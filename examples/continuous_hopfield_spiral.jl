@@ -29,65 +29,18 @@ function spiral_dataset(rng::AbstractRNG, n::Integer; noise=0.035f0)
     return inputs, targets, labels
 end
 
-struct HopfieldLayout
-    ninput::Int
-    nhidden::Int
-    noutput::Int
-end
-
-function unpack(parameters, layout::HopfieldLayout)
-    ni, nh, no = layout.ninput, layout.nhidden, layout.noutput
-    wx_stop = nh * ni
-    wh_stop = wx_stop + no * nh
-    bh_stop = wh_stop + nh
-    input_weights = reshape(view(parameters, 1:wx_stop), nh, ni)
-    hidden_weights = reshape(view(parameters, (wx_stop + 1):wh_stop), no, nh)
-    hidden_bias = view(parameters, (wh_stop + 1):bh_stop)
-    output_bias = view(parameters, (bh_stop + 1):length(parameters))
-    return input_weights, hidden_weights, hidden_bias, output_bias
-end
-
-function initialize_parameters(rng::AbstractRNG, layout::HopfieldLayout)
-    input_weights = 0.6f0 / sqrt(Float32(layout.ninput)) .* randn(
-        rng, Float32, layout.nhidden, layout.ninput,
-    )
-    hidden_weights = 0.6f0 / sqrt(Float32(layout.nhidden)) .* randn(
-        rng, Float32, layout.noutput, layout.nhidden,
-    )
-    return [vec(input_weights); vec(hidden_weights); zeros(Float32, layout.nhidden + layout.noutput)]
-end
-
-function continuous_hopfield_model(layout::HopfieldLayout)
-    nh = layout.nhidden
-    energy = function (state, parameters, input, model_state)
-        input_weights, hidden_weights, hidden_bias, output_bias =
-            unpack(parameters, layout)
-        hidden = view(state, 1:nh, :)
-        output = view(state, (nh + 1):size(state, 1), :)
-        hidden_rates = tanh.(hidden)
-        output_rates = tanh.(output)
-        batch_size = size(input, 2)
-
-        input_drive = input_weights * input .+ hidden_bias
-        hidden_drive = hidden_weights * hidden_rates
-        return (
-            sum(abs2, state) / 2 -
-            sum(input_drive .* hidden_rates) -
-            sum(hidden_drive .* output_rates) -
-            sum(output_bias .* output_rates)
-        ) / batch_size
-    end
-
-    return EPModel(
-        energy=energy,
-        cost=(state, target, parameters, model_state) -> begin
-            output = view(state, (nh + 1):size(state, 1), :)
-            sum(abs2, output .- target) / (2 * size(target, 2))
-        end,
-        readout=(state, parameters, model_state) ->
-            view(state, (nh + 1):size(state, 1), :),
-        initial_state=(parameters, input, model_state) ->
-            zeros(eltype(parameters), nh + layout.noutput, size(input, 2)),
+function spiral_network(hidden::Integer)
+    weight_initializer = (rng, rows, columns) ->
+        0.6f0 / sqrt(Float32(columns)) .* randn(rng, Float32, rows, columns)
+    return ContinuousHopfield(
+        (2, hidden, 2);
+        activation=tanh,
+        potential=QuadraticPotential(),
+        input_clamp=HardClamp(),
+        output_cost=BipolarSquaredError(),
+        bias=true,
+        recurrent=false,
+        weight_initializer,
     )
 end
 
@@ -138,9 +91,8 @@ function train_spiral(; epochs=30, points=400, batch_size=20, hidden=32, seed=7)
     points % batch_size == 0 || throw(ArgumentError("points must be divisible by batch_size"))
     rng = Xoshiro(seed)
     inputs, targets, labels = spiral_dataset(rng, points)
-    layout = HopfieldLayout(2, hidden, 2)
-    model = continuous_hopfield_model(layout)
-    parameters = initialize_parameters(rng, layout)
+    network = spiral_network(hidden)
+    model, parameters = EquilibriumPropagation.setup(rng, network)
     state_ad = AutoForwardDiff()
     algorithm = EPAlgorithm(
         SymmetricEP(0.15f0),
