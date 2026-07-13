@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Getting started · EquilibriumPropagation.jl</title><meta name="title" content="Getting started · EquilibriumPropagation.jl"/><meta property="og:title" content="Getting started · EquilibriumPropagation.jl"/><meta property="twitter:title" content="Getting started · EquilibriumPropagation.jl"/><meta name="description" content="Documentation for EquilibriumPropagation.jl."/><meta property="og:description" content="Documentation for EquilibriumPropagation.jl."/><meta property="twitter:description" content="Documentation for EquilibriumPropagation.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">EquilibriumPropagation.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Getting started</a><ul class="internal"><li><a class="tocitem" href="#Define-a-quadratic-energy"><span>Define a quadratic energy</span></a></li><li><a class="tocitem" href="#Configure-and-run-EP"><span>Configure and run EP</span></a></li><li><a class="tocitem" href="#Use-different-solvers-per-phase"><span>Use different solvers per phase</span></a></li><li><a class="tocitem" href="#Apply-an-optimizer-update"><span>Apply an optimizer update</span></a></li></ul></li><li><a class="tocitem" href="../concepts/">EP concepts</a></li><li><a class="tocitem" href="../solvers/">Optional equilibrium solvers</a></li><li><a class="tocitem" href="../continuous_ep/">Continuous EP</a></li><li><a class="tocitem" href="../nonconservative_ep/">Non-conservative EP</a></li><li><a class="tocitem" href="../holomorphic_ep/">Holomorphic EP</a></li><li><a class="tocitem" href="../lux/">Lux integration</a></li><li><a class="tocitem" href="../reactant/">OpenXLA acceleration with Reactant</a></li><li><a class="tocitem" href="../hopfield_spiral/">Continuous Hopfield example</a></li><li><a class="tocitem" href="../mnist/">MNIST classification example</a></li><li><a class="tocitem" href="../asymep_mlp/">Feedforward AsymEP MLP</a></li><li><a class="tocitem" href="../api/">API reference</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Getting started</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Getting started</a></li></ul></nav><div class="docs-right"><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Getting-started"><a class="docs-heading-anchor" href="#Getting-started">Getting started</a><a id="Getting-started-1"></a><a class="docs-heading-anchor-permalink" href="#Getting-started" title="Permalink"></a></h1><h2 id="Define-a-quadratic-energy"><a class="docs-heading-anchor" href="#Define-a-quadratic-energy">Define a quadratic energy</a><a id="Define-a-quadratic-energy-1"></a><a class="docs-heading-anchor-permalink" href="#Define-a-quadratic-energy" title="Permalink"></a></h2><p>This complete example has an analytical free equilibrium and is also representative of the package&#39;s low-level interface.</p><pre><code class="language-julia hljs">using ADTypes: AutoForwardDiff
+using EquilibriumPropagation
+using ForwardDiff # loads DifferentiationInterface&#39;s ForwardDiff extension
+using LinearAlgebra : dot
+
+function quadratic_energy(s, ps, x, st)
+    W = reshape(view(ps, 1:4), 2, 2)
+    b = view(ps, 5:6)
+    return 0.5f0 * dot(s, s) - dot(s, W, x) - dot(s, b)
+end
+
+cost(s, y, ps, st) = 0.5f0 * sum(abs2, s .- y)
+
+model = EPModel(
+    energy=quadratic_energy,
+    cost=cost,
+    readout=(s, ps, st) -&gt; s,
+    initial_state=(ps, x, st) -&gt; zeros(eltype(ps), 2),
+)
+
+parameters = Float32[0.2, 0.4, -0.1, 0.3, 0, 0]
+input = Float32[0.7, -0.4]
+target = Float32[-0.2, 0.8]
+problem = EPProblem(model, parameters, NamedTuple(), input, target)</code></pre><p>The four model functions obey these contracts:</p><ul><li><code>energy</code> and <code>cost</code> return scalars;</li><li><code>initial_state</code> returns the dynamical state relaxed by the solver;</li><li><code>readout</code> converts an equilibrium state to a prediction; and</li><li>model state remains constant during an equilibrium solve.</li></ul><h2 id="Configure-and-run-EP"><a class="docs-heading-anchor" href="#Configure-and-run-EP">Configure and run EP</a><a id="Configure-and-run-EP-1"></a><a class="docs-heading-anchor-permalink" href="#Configure-and-run-EP" title="Permalink"></a></h2><p>Select state and parameter differentiation separately. The implementation package (<code>ForwardDiff</code> here) must be loaded in addition to constructing its ADTypes selector.</p><pre><code class="language-julia hljs">algorithm = EPAlgorithm(
+    SymmetricEP(0.05f0),
+    Relaxation(dt=0.2f0, maxiters=100, abstol=1f-5);
+    state_ad=AutoForwardDiff(),
+    parameter_ad=AutoForwardDiff(),
+)
+
+phases = solve_phases(problem, algorithm)
+gradients = ep_gradient(problem, phases, algorithm)
+
+# Or solve phases, compute gradients, and collect diagnostics together:
+gradients, stats = ep_gradient(problem, algorithm)</code></pre><p>It is possible to inspect the stats of the computation : </p><pre><code class="language-julia hljs">julia&gt; stats
+EPStats
+  converged: true
+  loss: 0.277001
+  gradient norm: 0.958253
+  phase displacement: (positive = 0.0354358, negative = 0.0391642)
+  phases:
+    free: residual=8.39131f-6, iterations=46, energy=-0.029
+    positive: residual=9.71078f-6, iterations=35, energy=-0.0158095
+    negative: residual=8.1353f-6, iterations=40, energy=-0.0435789</code></pre><p>Check <code>stats.converged</code> before trusting an update. The individual residuals and iteration counts show which phase needs a smaller step, looser/tighter tolerance, or larger iteration budget.</p><h2 id="Use-different-solvers-per-phase"><a class="docs-heading-anchor" href="#Use-different-solvers-per-phase">Use different solvers per phase</a><a id="Use-different-solvers-per-phase-1"></a><a class="docs-heading-anchor-permalink" href="#Use-different-solvers-per-phase" title="Permalink"></a></h2><p>Nudged phases are often easier to warm-start than the free phase. Configure them independently without changing the EP protocol:</p><pre><code class="language-julia hljs">algorithm = EPAlgorithm(
+    SymmetricEP(0.05f0),
+    Relaxation(dt=0.2f0, maxiters=100, abstol=1f-5);
+    free_solver=Relaxation(dt=0.15f0, maxiters=150, abstol=1f-6),
+    positive_solver=Relaxation(dt=0.2f0, maxiters=75, abstol=1f-5),
+    negative_solver=Relaxation(dt=0.2f0, maxiters=75, abstol=1f-5),
+    state_ad=AutoForwardDiff(),
+    parameter_ad=AutoForwardDiff(),
+)</code></pre><h2 id="Apply-an-optimizer-update"><a class="docs-heading-anchor" href="#Apply-an-optimizer-update">Apply an optimizer update</a><a id="Apply-an-optimizer-update-1"></a><a class="docs-heading-anchor-permalink" href="#Apply-an-optimizer-update" title="Permalink"></a></h2><p>Loading Optimisers activates the optional training extension:</p><pre><code class="language-julia hljs">using Optimisers
+
+optimizer_state = Optimisers.setup(Optimisers.Adam(1f-3), parameters)
+optimizer_state, parameters, stats = train_step!(
+    optimizer_state,
+    parameters,
+    model,
+    (input, target),
+    algorithm,
+)</code></pre><p>Both optimizer state and model parameters are explicit return values, making a training loop straightforward to checkpoint.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../concepts/">EP concepts »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 13 July 2026 16:01">Monday 13 July 2026</span>. Using Julia version 1.11.9.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
