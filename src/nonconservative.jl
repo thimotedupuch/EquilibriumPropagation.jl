@@ -44,6 +44,18 @@ function _equilibrate_field(problem::EPProblem{<:DynamicalModel}, solver::Relaxa
                                missing, FreePhase())
 end
 
+function equilibrate(
+    problem::EPProblem{<:DynamicalModel},
+    ::FreePhase,
+    solver::Relaxation;
+    state_ad=nothing,
+    initial_state_override=nothing,
+)
+    return _equilibrate_field(
+        problem, solver; initial_state_override,
+    )
+end
+
 function _equilibrate_asym(problem::EPProblem{<:DynamicalModel}, free_state,
                            antisymmetric_jacobian, β, solver::Relaxation, state_ad)
     state = copy(free_state)

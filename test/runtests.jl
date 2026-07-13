@@ -34,7 +34,12 @@ include("test_holomorphic.jl")
 if Base.find_package("Lux") !== nothing
     using Lux
     include("test_lux_extension.jl")
+    include("test_asymep_mlp_example.jl")
 end
 include("test_show.jl")
 include("test_optimisers.jl")
 include("test_examples.jl")
+if Base.find_package("MLDatasets") !== nothing
+    using MLDatasets
+    include("test_mnist_example.jl")
+end

@@ -60,17 +60,18 @@ end
 """
 Construct a quadratic energy-based classifier.
 
-Images are fixed external inputs. The ten output neurons are the dynamical state
-relaxed by EP, and their free equilibrium contains the class scores. This uses the
-same [`ContinuousHopfield`](@ref) builder as deeper networks, with identity activation
-to make the classifier linear.
+Images are fixed external inputs. A hidden population and the ten output neurons form
+the dynamical state relaxed by EP, and the output free equilibrium contains the class
+scores. The shared scalar energy creates reciprocal hidden-output interactions, making
+this a genuine continuous Hopfield classifier rather than a linear readout.
 """
-function mnist_classifier(ninput::Integer)
+function mnist_classifier(ninput::Integer; hidden=64)
+    hidden > 0 || throw(ArgumentError("hidden must be positive"))
     weight_initializer = (rng, rows, columns) ->
-        0.05f0 .* randn(rng, Float32, rows, columns)
+        0.5f0 / sqrt(Float32(columns)) .* randn(rng, Float32, rows, columns)
     return ContinuousHopfield(
-        (ninput, 10);
-        activation=identity,
+        (ninput, hidden, 10);
+        activation=tanh,
         weight_initializer,
     )
 end
@@ -105,11 +106,12 @@ end
 
 function parse_mnist_options(arguments)
     options = Dict(
-        "epochs" => 20,
-        "train-samples" => 10_000,
-        "test-samples" => 2_000,
-        "batch-size" => 32,
-        "pool" => 1,
+        "epochs" => 10,
+        "train-samples" => 1_000,
+        "test-samples" => 500,
+        "batch-size" => 20,
+        "pool" => 4,
+        "hidden" => 64,
         "seed" => 7,
     )
     for argument in arguments
@@ -123,12 +125,13 @@ function parse_mnist_options(arguments)
 end
 
 function train_mnist(
-    ; epochs=20, train_samples=5_000, test_samples=2_000, batch_size=20, pool=4, seed=7,
+    ; epochs=10, train_samples=1_000, test_samples=500, batch_size=20, pool=4,
+      hidden=64, seed=7,
 )
     rng = Xoshiro(seed)
     train_inputs, train_targets, train_labels, test_inputs, _, test_labels =
         load_mnist(; train_samples, test_samples, pool, seed)
-    network = mnist_classifier(size(train_inputs, 1))
+    network = mnist_classifier(size(train_inputs, 1); hidden)
     model, parameters = EquilibriumPropagation.setup(rng, network)
     state_ad = AutoForwardDiff()
     algorithm = EPAlgorithm(
@@ -142,7 +145,7 @@ function train_mnist(
     initial_accuracy = mnist_accuracy(
         model, parameters, test_inputs, test_labels, state_ad; batch_size,
     )
-    @printf "MNIST EP classifier: %d pooled pixels -> 10 outputs\n" size(train_inputs, 1)
+    @printf "MNIST Hopfield classifier: %d-%d-10\n" size(train_inputs, 1) hidden
     @printf "initial test accuracy: %5.1f%%\n" (100 * initial_accuracy)
 
     for epoch in 1:epochs
@@ -199,6 +202,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         test_samples=options["test-samples"],
         batch_size=options["batch-size"],
         pool=options["pool"],
+        hidden=options["hidden"],
         seed=options["seed"],
     )
     @printf "final test accuracy: %5.1f%%\n" (100 * result.accuracy)

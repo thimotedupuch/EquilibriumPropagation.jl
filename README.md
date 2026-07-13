@@ -102,6 +102,8 @@ The [Holomorphic EP guide](docs/src/holomorphic_ep.md) covers complex-valued mod
 requirements and finite Fourier sampling.
 Lux users can keep explicit parameter and state trees through `lux_energy_model` and
 `lux_dynamical_model`; see the [Lux integration guide](docs/src/lux.md).
+The [feedforward MLP tutorial](docs/src/asymep_mlp.md) trains triangular Lux dynamics
+with AsymEP, while the MNIST tutorial now uses a hidden Hopfield population.
 
 ## Continuous Hopfield spiral example
 
@@ -121,6 +123,16 @@ julia --project=examples examples/mnist_classification.jl
 
 The default run uses 7×7 average-pooled images, 1,000 training examples, and 500 test
 examples. See the [MNIST example guide](docs/src/mnist.md) for command-line options.
+
+## Feedforward AsymEP MLP tutorial
+
+```bash
+julia --project=examples examples/asymep_mlp.jl
+```
+
+This tutorial expresses a directed `2 → 16 → 2` Lux MLP as triangular equilibrium
+dynamics and trains it on interleaved spirals with AsymEP. See the
+[feedforward MLP guide](docs/src/asymep_mlp.md) for the equations and options.
 
 ## Testing
 

@@ -22,6 +22,7 @@ makedocs(
         "Lux integration" => "lux.md",
         "Continuous Hopfield example" => "hopfield_spiral.md",
         "MNIST classification example" => "mnist.md",
+        "Feedforward AsymEP MLP" => "asymep_mlp.md",
         "API reference" => "api.md",
     ],
     checkdocs=:exports,
