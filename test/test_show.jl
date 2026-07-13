@@ -8,6 +8,9 @@
     @test repr(NudgedPhase(0.5)) == "NudgedPhase(0.5)"
     @test repr(OneSidedEP(0.1)) == "OneSidedEP(0.1)"
     @test repr(SymmetricEP(0.1)) == "SymmetricEP(0.1)"
+    @test repr(ReactantEP(SymmetricEP(0.1); dt=0.2, free_steps=3,
+                         nudged_steps=4, learning_rate=0.01)) ==
+          "ReactantEP(SymmetricEP(0.1); dt=0.2, free_steps=3, nudged_steps=4, learning_rate=0.01)"
     @test repr(Relaxation()) ==
           "Relaxation(dt=0.1, maxiters=100, abstol=1.0e-6, reltol=0.0)"
     @test startswith(repr(problem), "EPProblem(model=EPModel(")

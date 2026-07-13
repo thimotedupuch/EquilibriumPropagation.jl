@@ -18,7 +18,8 @@ The package currently provides:
   DifferentiationInterface;
 - structured convergence and gradient diagnostics;
 - an optional Optimisers.jl training extension;
-- optional Lux adapters for scalar energies and non-conservative vector fields; and
+- optional Lux adapters for scalar energies and non-conservative vector fields;
+- optional Reactant/EnzymeMLIR compilation of fixed-shape batched EP with OpenXLA; and
 - continuous Hopfield examples for a two-dimensional spiral and MNIST classification.
 
 ## Installation
@@ -104,6 +105,8 @@ Lux users can keep explicit parameter and state trees through `lux_energy_model`
 `lux_dynamical_model`; see the [Lux integration guide](docs/src/lux.md).
 The [feedforward MLP tutorial](docs/src/asymep_mlp.md) trains triangular Lux dynamics
 with AsymEP, while the MNIST tutorial now uses a hidden Hopfield population.
+The [Reactant guide](docs/src/reactant.md) compiles batched symmetric EP for OpenXLA
+CPU, GPU, or TPU and explains the static-shape execution contract.
 
 ## Continuous Hopfield spiral example
 
@@ -133,6 +136,16 @@ julia --project=examples examples/asymep_mlp.jl
 This tutorial expresses a directed `2 → 16 → 2` Lux MLP as triangular equilibrium
 dynamics and trains it on interleaved spirals with AsymEP. See the
 [feedforward MLP guide](docs/src/asymep_mlp.md) for the equations and options.
+
+## Accelerated EP with Reactant
+
+```bash
+julia --project=examples examples/reactant_ep.jl --backend=cpu
+```
+
+This example compiles fixed-step symmetric EP and its EnzymeMLIR gradients with
+OpenXLA, then reuses the executable and device parameters across equal-shaped
+minibatches. Use `--backend=gpu` or `--backend=tpu` on configured hardware.
 
 ## Testing
 

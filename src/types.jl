@@ -445,3 +445,44 @@ struct HolomorphicEPStats{P,L,G,I,D}
     phase_displacement::D
     converged::Bool
 end
+
+"""
+    ReactantEP(protocol; dt=0.1, free_steps=100, nudged_steps=50,
+               learning_rate=nothing)
+
+Static-shape equilibrium-propagation algorithm intended for OpenXLA compilation by
+the optional Reactant extension. Every phase executes its configured number of Euler
+steps; convergence is reported through terminal residuals rather than data-dependent
+early stopping. `protocol` must be [`OneSidedEP`](@ref) or [`SymmetricEP`](@ref).
+
+When `learning_rate` is provided, the compiled kernel additionally returns one
+plain-SGD parameter update. The phase solve and EnzymeMLIR gradients remain the main
+accelerated workload.
+"""
+struct ReactantEP{P,T,L}
+    protocol::P
+    dt::T
+    free_steps::Int
+    nudged_steps::Int
+    learning_rate::L
+end
+
+function ReactantEP(
+    protocol::Union{OneSidedEP,SymmetricEP};
+    dt=0.1,
+    free_steps=100,
+    nudged_steps=50,
+    learning_rate=nothing,
+)
+    dt > zero(dt) || throw(ArgumentError("dt must be positive"))
+    free_steps >= 0 || throw(ArgumentError("free_steps must be nonnegative"))
+    nudged_steps >= 0 || throw(ArgumentError("nudged_steps must be nonnegative"))
+    if learning_rate !== nothing
+        learning_rate >= zero(learning_rate) || throw(ArgumentError(
+            "learning_rate must be nonnegative",
+        ))
+    end
+    return ReactantEP(
+        protocol, dt, Int(free_steps), Int(nudged_steps), learning_rate,
+    )
+end

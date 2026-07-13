@@ -20,7 +20,7 @@ include("continuous.jl")
 include("nonconservative.jl")
 include("holomorphic.jl")
 
-export EPModel, DynamicalModel, EPProblem, EPAlgorithm
+export EPModel, DynamicalModel, EPProblem, EPBatch, batch_size, EPAlgorithm
 export FreePhase, NudgedPhase, OneSidedEP, SymmetricEP, HolomorphicEP
 export Relaxation, EquilibriumSolution, EPPhases, HolomorphicPhases, EPStats
 export ODERelaxation, SteadyStateRelaxation, RootRelaxation, solver_details
@@ -33,6 +33,26 @@ export ZeroState, GlorotUniform, setup, pack_parameters, unpack_parameters
 export equilibrate, solve_phases, ep_gradient, predict
 export apply_gradient!, train_step!
 export lux_setup, lux_energy_model, lux_dynamical_model
+export ReactantEP, reactant_inputs, compile_reactant
+
+"""
+    reactant_inputs(problem; backend=nothing)
+
+Transfer a conservative array-state problem's parameters, model state, batch, and
+initial state to Reactant device arrays. Loading Reactant and Enzyme activates this
+function. Select `backend="cpu"`, `"gpu"`, or `"tpu"` before transfer when desired.
+"""
+function reactant_inputs end
+
+"""
+    compile_reactant(problem, algorithm::ReactantEP; backend=nothing, kwargs...)
+
+Compile fixed-step batched EP relaxation and EnzymeMLIR gradient extraction through
+Reactant/OpenXLA. Returns a reusable executable that owns its initial device buffers
+and also accepts same-shaped device parameters, model state, batch, and initial state.
+Loading Reactant and Enzyme activates this function.
+"""
+function compile_reactant end
 
 """
     lux_setup(rng, layer) -> parameters, model_state

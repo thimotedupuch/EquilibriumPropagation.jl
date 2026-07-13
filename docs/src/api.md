@@ -6,6 +6,8 @@
 EPModel
 DynamicalModel
 EPProblem
+EPBatch
+batch_size
 energy
 vector_field
 cost
@@ -48,6 +50,7 @@ EPAlgorithm
 ContinuousEP
 AsymEP
 DyadicEP
+ReactantEP
 ```
 
 ## Solving and gradients
@@ -58,6 +61,8 @@ solve_phases
 ep_gradient
 continuous_ep
 continuous_train_step!
+reactant_inputs
+compile_reactant
 ```
 
 ## Results and diagnostics

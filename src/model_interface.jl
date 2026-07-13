@@ -56,6 +56,40 @@ struct EPProblem{M,P,S,X,Y}
     target::Y
 end
 
+"""
+    EPBatch(input, target)
+
+Minimal fixed-shape batch container. Array values use either feature vectors (batch
+size one) or `features × batch` matrices. A compiled Reactant executable is specialized
+to the shapes used during compilation and can be reused with another `EPBatch` of the
+same shapes.
+"""
+struct EPBatch{X,Y}
+    input::X
+    target::Y
+end
+
+function EPBatch(input::AbstractArray, target::AbstractArray)
+    ndims(input) in (1, 2) || throw(DimensionMismatch(
+        "batch input must be a feature vector or features × batch matrix",
+    ))
+    ndims(target) == ndims(input) || throw(DimensionMismatch(
+        "batch input and target must have the same number of dimensions",
+    ))
+    input_batch = ndims(input) == 1 ? 1 : size(input, 2)
+    target_batch = ndims(target) == 1 ? 1 : size(target, 2)
+    input_batch == target_batch || throw(DimensionMismatch(
+        "batch input and target contain different numbers of observations",
+    ))
+    return EPBatch{typeof(input),typeof(target)}(input, target)
+end
+
+"""Return the number of observations in an [`EPBatch`](@ref)."""
+batch_size(batch::EPBatch) = ndims(batch.input) == 1 ? 1 : size(batch.input, 2)
+
+EPProblem(model, parameters, model_state, batch::EPBatch) =
+    EPProblem(model, parameters, model_state, batch.input, batch.target)
+
 """Return a model's scalar internal energy at `state`."""
 energy(model::EPModel, state, parameters, model_state, input) =
     model.energy(state, parameters, input, model_state)

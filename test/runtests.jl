@@ -36,6 +36,11 @@ if Base.find_package("Lux") !== nothing
     include("test_lux_extension.jl")
     include("test_asymep_mlp_example.jl")
 end
+if all(package -> Base.find_package(package) !== nothing, ("Reactant", "Enzyme"))
+    using Enzyme
+    using Reactant
+    include("test_reactant_extension.jl")
+end
 include("test_show.jl")
 include("test_optimisers.jl")
 include("test_examples.jl")

@@ -100,6 +100,17 @@ function Base.show(io::IO, algorithm::DyadicEP)
     return print(io, ')')
 end
 
+function Base.show(io::IO, algorithm::ReactantEP)
+    print(io, "ReactantEP(")
+    _show_compact(io, algorithm.protocol)
+    print(io, "; dt=")
+    _show_compact(io, algorithm.dt)
+    print(io, ", free_steps=", algorithm.free_steps,
+          ", nudged_steps=", algorithm.nudged_steps, ", learning_rate=")
+    _show_compact(io, algorithm.learning_rate)
+    return print(io, ')')
+end
+
 function Base.show(io::IO, model::EPModel)
     print(io, "EPModel(energy=")
     _show_compact(io, model.energy)

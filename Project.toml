@@ -14,22 +14,26 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 ADTypes = "1.22.2"
 CommonSolve = "0.2.11"
 DifferentiationInterface = "0.7.20"
+Enzyme = "0.13"
 Functors = "0.5.2"
 Lux = "1.31"
 NonlinearSolve = "3, 4"
 Optimisers = "0.4"
 OrdinaryDiffEqRosenbrock = "1, 2"
 OrdinaryDiffEqTsit5 = "1, 2"
+Reactant = "0.2"
 SciMLBase = "2, 3"
 SteadyStateDiffEq = "2"
 julia = "1.10"
 
 [weakdeps]
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 Lux = "b2108857-7c20-44ae-9111-449ecde12c47"
 NonlinearSolve = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
 Optimisers = "3bd65402-5787-11e9-1adc-39752487f4e2"
 OrdinaryDiffEqRosenbrock = "43230ef6-c299-4910-a778-202eb28ce4ce"
 OrdinaryDiffEqTsit5 = "b1df2697-797e-41e3-8120-5422d3b24e4a"
+Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 SteadyStateDiffEq = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
 
@@ -42,6 +46,7 @@ EquilibriumPropagationOrdinaryDiffEqRosenbrockExt = [
     "OrdinaryDiffEqRosenbrock",
 ]
 EquilibriumPropagationOrdinaryDiffEqTsit5Ext = ["SciMLBase", "OrdinaryDiffEqTsit5"]
+EquilibriumPropagationReactantExt = ["Reactant", "Enzyme"]
 EquilibriumPropagationSteadyStateDiffEqExt = ["SciMLBase", "SteadyStateDiffEq"]
 
 [extras]

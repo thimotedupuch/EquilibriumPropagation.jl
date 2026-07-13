@@ -196,6 +196,14 @@ The extension should define a clear boundary between:
 
 ### Reactant extension and minimal batching
 
+**Status:** initial implementation complete. `EPBatch` records the package's
+`features × batch` convention, while the optional Reactant/Enzyme extension transfers
+fixed-shape problems and compiles one-sided or symmetric EP relaxation, EnzymeMLIR
+phase gradients, residual diagnostics, and an optional plain-SGD update through
+OpenXLA. The same executable and device parameters can be reused across equal-shaped
+minibatches on CPU, GPU, or TPU. Dynamic convergence, non-conservative protocols,
+tree-valued states, and adaptive solvers remain future extensions.
+
 Add a Reactant.jl extension so that supported phase solving and training workloads can
 be compiled. Introduce only the minimal batching abstraction required to express and
 compile minibatched examples, avoiding a package-wide data-loading or training-loop
