@@ -30,3 +30,8 @@ makedocs(
     remotes=nothing,
     warnonly=false,
 )
+
+deploydocs(
+    repo="github.com/thimotedupuch/EquilibriumPropagation.jl.git",
+    devbranch="master",
+)
