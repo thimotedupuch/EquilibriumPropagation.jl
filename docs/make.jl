@@ -25,6 +25,7 @@ makedocs(
         "Continuous Hopfield example" => "hopfield_spiral.md",
         "MNIST classification example" => "mnist.md",
         "Feedforward AsymEP MLP" => "asymep_mlp.md",
+        "Arbitrary Lux CNN with AsymEP" => "lux_cnn_asymep.md",
         "API reference" => "api.md",
     ],
     checkdocs=:exports,

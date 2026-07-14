@@ -32,6 +32,7 @@ Useful entry points:
 - [Continuous Hopfield network on interleaved spirals](https://thimotedupuch.github.io/EquilibriumPropagation.jl/dev/hopfield_spiral/)
 - [MNIST classification with a continuous Hopfield network](https://thimotedupuch.github.io/EquilibriumPropagation.jl/dev/mnist/)
 - [Feedforward Lux MLP trained with AsymEP](https://thimotedupuch.github.io/EquilibriumPropagation.jl/dev/asymep_mlp/)
+- [Train a compact VGG-style Lux CNN with AsymEP or Dyadic EP](https://thimotedupuch.github.io/EquilibriumPropagation.jl/dev/lux_cnn_asymep/)
 - [CIFAR-10 with frozen Lux convolutions and a Reactant-compiled CHN](https://thimotedupuch.github.io/EquilibriumPropagation.jl/dev/reactant_cifar10/)
 
 Runnable versions live in the [`examples/`](examples) directory.

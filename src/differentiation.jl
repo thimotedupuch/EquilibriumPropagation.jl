@@ -85,34 +85,39 @@ function _flatten_parameter_tree(tree)
 end
 
 function _rebuild_parameter_tree(template, packed; copy_leaves=false)
-    offset = Ref(0)
-    return _rebuild_parameter_tree(template, packed, offset, copy_leaves)
+    rebuilt, next_index = _rebuild_parameter_tree(template, packed, 1, copy_leaves)
+    next_index == length(packed) + 1 || throw(DimensionMismatch(
+        "packed parameter vector has $(length(packed)) entries, but the template consumes " *
+        "$(next_index - 1)",
+    ))
+    return rebuilt
 end
 
-function _rebuild_parameter_tree(template::AbstractArray, packed, offset, copy_leaves)
+function _rebuild_parameter_tree(template::AbstractArray, packed, first_index, copy_leaves)
     count = length(template)
-    indices = (offset[] + 1):(offset[] + count)
-    offset[] += count
+    indices = first_index:(first_index + count - 1)
     result = reshape(view(packed, indices), size(template))
-    return copy_leaves ? copy(result) : result
+    return (copy_leaves ? copy(result) : result), first_index + count
 end
 
-function _rebuild_parameter_tree(template::Number, packed, offset, copy_leaves)
-    offset[] += 1
-    return packed[offset[]]
+function _rebuild_parameter_tree(template::Number, packed, first_index, copy_leaves)
+    return packed[first_index], first_index + 1
 end
 
-function _rebuild_parameter_tree(template::NamedTuple, packed, offset, copy_leaves)
-    rebuilt = map(
-        value -> _rebuild_parameter_tree(value, packed, offset, copy_leaves),
-        values(template),
+function _rebuild_parameter_tree(template::NamedTuple, packed, first_index, copy_leaves)
+    rebuilt, next_index = _rebuild_parameter_tree(
+        values(template), packed, first_index, copy_leaves,
     )
-    return NamedTuple{keys(template)}(rebuilt)
+    return NamedTuple{keys(template)}(rebuilt), next_index
 end
 
-function _rebuild_parameter_tree(template::Tuple, packed, offset, copy_leaves)
-    return map(
-        value -> _rebuild_parameter_tree(value, packed, offset, copy_leaves),
-        template,
+function _rebuild_parameter_tree(template::Tuple, packed, first_index, copy_leaves)
+    isempty(template) && return (), first_index
+    head, after_head = _rebuild_parameter_tree(
+        first(template), packed, first_index, copy_leaves,
     )
+    tail, next_index = _rebuild_parameter_tree(
+        Base.tail(template), packed, after_head, copy_leaves,
+    )
+    return (head, tail...), next_index
 end
