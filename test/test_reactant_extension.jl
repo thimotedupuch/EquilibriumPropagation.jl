@@ -2,6 +2,7 @@ using ADTypes: AutoForwardDiff
 using EquilibriumPropagation
 using Enzyme
 using ForwardDiff
+using Optimisers
 using Reactant
 using Test
 
@@ -9,6 +10,23 @@ reactant_test_energy(s, ps, x, st) = sum(abs2, s) / 2 - sum(s .* (ps * x))
 reactant_test_cost(s, y, ps, st) = sum(abs2, s .- y) / (2 * size(y, 2))
 reactant_test_readout(s, ps, st) = s
 reactant_test_initial(ps, x, st) = zero(ps * x)
+
+function reactant_tree_energy(s, ps, x, st)
+    return sum(abs2, s.hidden) / 2 + sum(abs2, s.output) / 2 -
+           sum(s.hidden .* (ps.input * x)) -
+           sum(s.output .* (ps.readout * s.hidden))
+end
+reactant_tree_cost(s, y, ps, st) = sum(abs2, s.output .- y) / (2 * size(y, 2))
+reactant_tree_readout(s, ps, st) = s.output
+function reactant_tree_initial(ps, x, st)
+    hidden = zero(ps.input * x)
+    return (hidden=hidden, output=zero(ps.readout * hidden))
+end
+
+reactant_field(s, ps, x, st) = st.matrix * s + ps
+reactant_field_cost(s, y, ps, st) = sum(abs2, s .- y) / 2
+reactant_field_readout(s, ps, st) = s
+reactant_field_initial(ps, x, st) = zero(ps)
 
 @testset "Reactant extension" begin
     Reactant.set_default_backend("cpu")
@@ -69,4 +87,109 @@ reactant_test_initial(ps, x, st) = zero(ps * x)
         second_inputs.initial_state,
     )
     @test all(isfinite, Array(reused_result.parameters))
+    @test Int(result.free_iterations) == compiled_algorithm.free_steps
+    @test Bool(result.converged) == false
+
+    tree_parameters = (
+        input=Float32[0.2 -0.1; 0.3 0.4; -0.2 0.1],
+        readout=Float32[0.1 -0.3 0.2; -0.2 0.2 0.4],
+    )
+    tree_model = EPModel(
+        energy=reactant_tree_energy,
+        cost=reactant_tree_cost,
+        readout=reactant_tree_readout,
+        initial_state=reactant_tree_initial,
+    )
+    tree_problem = EPProblem(
+        tree_model,
+        tree_parameters,
+        NamedTuple(),
+        EPBatch(input, target),
+    )
+    stopping_algorithm = ReactantEP(
+        OneSidedEP(0.1f0);
+        dt=0.2f0,
+        free_steps=8,
+        nudged_steps=6,
+        abstol=100.0f0,
+        reltol=0.0f0,
+    )
+    tree_result = compile_reactant(
+        tree_problem, stopping_algorithm; backend="cpu",
+    )()
+    @test tree_result.free_state isa NamedTuple
+    @test keys(tree_result.free_state) == (:hidden, :output)
+    @test keys(tree_result.gradient) == keys(tree_parameters)
+    @test Int(tree_result.free_iterations) == 0
+    @test Int(tree_result.positive_iterations) == 0
+    @test Bool(tree_result.converged)
+    @test all(isfinite, Array(tree_result.gradient.input))
+    @test all(isfinite, Array(tree_result.gradient.readout))
+
+    field_model = DynamicalModel(
+        dynamics=reactant_field,
+        cost=reactant_field_cost,
+        readout=reactant_field_readout,
+        initial_state=reactant_field_initial,
+    )
+    field_problem = EPProblem(
+        field_model,
+        Float32[0.3, -0.2],
+        (matrix=Float32[-2 1; 0 -1],),
+        nothing,
+        Float32[-0.4, 0.7],
+    )
+    field_solver = Relaxation(
+        dt=0.1f0, maxiters=20, abstol=0.0f0, reltol=0.0f0,
+    )
+    field_backend = AutoForwardDiff()
+    asym = AsymEP(
+        1f-3, field_solver;
+        state_ad=field_backend, parameter_ad=field_backend,
+    )
+    compiled_asym = compile_reactant(
+        field_problem, asym, Optimisers.Adam(1f-2); backend="cpu",
+    )()
+    reference_asym = ep_gradient(field_problem, asym)[1]
+    @test all(isfinite, Array(compiled_asym.gradient))
+    @test Array(compiled_asym.gradient) ≈ reference_asym rtol=3f-4 atol=3f-5
+    @test Array(compiled_asym.parameters) != field_problem.parameters
+    @test Int(compiled_asym.free_iterations) == field_solver.maxiters
+
+    dyadic = DyadicEP(
+        1f-3, field_solver;
+        state_ad=field_backend, parameter_ad=field_backend,
+    )
+    compiled_dyadic = compile_reactant(
+        field_problem, dyadic; backend="cpu",
+    )()
+    reference_dyadic = ep_gradient(field_problem, dyadic)[1]
+    @test all(isfinite, Array(compiled_dyadic.gradient))
+    @test Array(compiled_dyadic.gradient) ≈ reference_dyadic rtol=3f-4 atol=3f-5
+    @test size(Array(compiled_dyadic.difference_state)) == size(field_problem.parameters)
+
+    continuous = ContinuousEP(
+        0.1f0,
+        Relaxation(dt=0.2f0, maxiters=2, abstol=0.0f0);
+        state_ad=field_backend,
+        parameter_ad=field_backend,
+    )
+    compiled_continuous = compile_reactant(
+        problem, continuous, Optimisers.Descent(1f-2); backend="cpu",
+    )()
+    reference_optimizer = Optimisers.setup(Optimisers.Descent(1f-2), parameters)
+    _, reference_continuous_parameters, _ = continuous_train_step!(
+        reference_optimizer, problem, continuous,
+    )
+    @test Int(compiled_continuous.iterations) == 2
+    @test Array(compiled_continuous.parameters) != parameters
+    @test Array(compiled_continuous.parameters) ≈
+          reference_continuous_parameters rtol=3f-4 atol=3f-5
+
+    holomorphic = ReactantEP(
+        HolomorphicEP(0.1f0; points=4); free_steps=2, nudged_steps=2,
+    )
+    @test_throws ArgumentError compile_reactant(
+        problem, holomorphic; backend="cpu",
+    )
 end

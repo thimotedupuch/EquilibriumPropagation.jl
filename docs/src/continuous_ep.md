@@ -6,19 +6,19 @@ uses the continual-update rule of [Ernoult et al.](https://arxiv.org/abs/2005.04
 the ordinary EP parameter-gradient contrast is written as a telescoping sum over
 consecutive nudged states.
 
-For state step ``t``, current parameters ``\theta_t``, and augmented energy
-``F(s,\theta,\beta)=E(s,\theta)+\beta C(s,\theta)``, the package alternates
+For state step ``t``, current parameters ``\theta_t``, and total energy
+``F_\beta(s;\theta)=E(s;\theta)+\beta C(s;\theta)``, the package alternates
 
 ```math
-s_{t+1} = s_t - \epsilon_s\,\partial_s F(s_t,\theta_t,\beta_t)
+s_{t+1} = s_t - \epsilon_s\,\partial_s F_{\beta_t}(s_t;\theta_t)
 ```
 
 and a parameter update based on
 
 ```math
 g_t = \frac{
-    \partial_\theta F(s_{t+1},\theta_t,\beta_t)
-    - \partial_\theta F(s_t,\theta_t,\beta_{t-1})
+    \partial_\theta F_{\beta_t}(s_{t+1};\theta_t)
+    - \partial_\theta F_{\beta_{t-1}}(s_t;\theta_t)
 }{\beta_t}.
 ```
 

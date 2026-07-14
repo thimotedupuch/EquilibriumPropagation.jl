@@ -1,19 +1,19 @@
 # EP concepts
 
-## Augmented energy and phases
+## Total energy and phases
 
 For state ``s``, parameters ``\theta``, input ``x``, target ``y``, and nudging
-strength ``\beta``, EquilibriumPropagation.jl uses
+strength ``\beta``, write the total energy, following the usual EP notation, as
 
 ```math
-\Phi_\beta(s; \theta, x, y)
+F_\beta(s; \theta, x, y)
 = E(s; \theta, x) + \beta C(s, y; \theta).
 ```
 
 The built-in relaxation follows the state gradient flow with an explicit Euler step:
 
 ```math
-s_{k+1} = s_k - \Delta t\,\nabla_s\Phi_\beta(s_k).
+s_{k+1} = s_k - \Delta t\,\nabla_s F_\beta(s_k;\theta,x,y).
 ```
 
 The free phase uses ``\beta=0``. Nudged phases start from the converged free state,
@@ -26,16 +26,16 @@ nearby equilibrium branch.
 
 ```math
 g_\theta \approx
-\frac{\partial_\theta\Phi_\beta(s_\beta)
-- \partial_\theta\Phi_0(s_0)}{\beta}.
+\frac{\partial_\theta F_\beta(s_\beta;\theta,x,y)
+- \partial_\theta F_0(s_0;\theta,x,y)}{\beta}.
 ```
 
 [`SymmetricEP`](@ref) uses positive and negative nudging:
 
 ```math
 g_\theta \approx
-\frac{\partial_\theta\Phi_{+\beta}(s_{+\beta})
-- \partial_\theta\Phi_{-\beta}(s_{-\beta})}{2\beta}.
+\frac{\partial_\theta F_{+\beta}(s_{+\beta};\theta,x,y)
+- \partial_\theta F_{-\beta}(s_{-\beta};\theta,x,y)}{2\beta}.
 ```
 
 Symmetric EP cancels the leading finite-``\beta`` error and is the recommended

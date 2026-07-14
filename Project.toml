@@ -47,6 +47,7 @@ EquilibriumPropagationOrdinaryDiffEqRosenbrockExt = [
 ]
 EquilibriumPropagationOrdinaryDiffEqTsit5Ext = ["SciMLBase", "OrdinaryDiffEqTsit5"]
 EquilibriumPropagationReactantExt = ["Reactant", "Enzyme"]
+EquilibriumPropagationReactantOptimisersExt = ["Reactant", "Enzyme", "Optimisers"]
 EquilibriumPropagationSteadyStateDiffEqExt = ["SciMLBase", "SteadyStateDiffEq"]
 
 [extras]

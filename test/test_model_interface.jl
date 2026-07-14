@@ -41,5 +41,7 @@ include("setup.jl")
     @test_throws ArgumentError ReactantEP(OneSidedEP(0.1); dt=0.0)
     @test_throws ArgumentError ReactantEP(OneSidedEP(0.1); free_steps=-1)
     @test_throws ArgumentError ReactantEP(OneSidedEP(0.1); nudged_steps=-1)
+    @test_throws ArgumentError ReactantEP(OneSidedEP(0.1); abstol=-1)
+    @test_throws ArgumentError ReactantEP(OneSidedEP(0.1); reltol=-1)
     @test_throws ArgumentError ReactantEP(OneSidedEP(0.1); learning_rate=-0.1)
 end

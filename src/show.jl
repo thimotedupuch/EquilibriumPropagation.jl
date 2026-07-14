@@ -106,7 +106,14 @@ function Base.show(io::IO, algorithm::ReactantEP)
     print(io, "; dt=")
     _show_compact(io, algorithm.dt)
     print(io, ", free_steps=", algorithm.free_steps,
-          ", nudged_steps=", algorithm.nudged_steps, ", learning_rate=")
+          ", nudged_steps=", algorithm.nudged_steps)
+    if !iszero(algorithm.abstol) || !iszero(algorithm.reltol)
+        print(io, ", abstol=")
+        _show_compact(io, algorithm.abstol)
+        print(io, ", reltol=")
+        _show_compact(io, algorithm.reltol)
+    end
+    print(io, ", learning_rate=")
     _show_compact(io, algorithm.learning_rate)
     return print(io, ')')
 end

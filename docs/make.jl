@@ -21,6 +21,7 @@ makedocs(
         "Holomorphic EP" => "holomorphic_ep.md",
         "Lux integration" => "lux.md",
         "OpenXLA acceleration with Reactant" => "reactant.md",
+        "CIFAR-10 with Reactant and a CHN" => "reactant_cifar10.md",
         "Continuous Hopfield example" => "hopfield_spiral.md",
         "MNIST classification example" => "mnist.md",
         "Feedforward AsymEP MLP" => "asymep_mlp.md",

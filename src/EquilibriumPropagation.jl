@@ -38,19 +38,31 @@ export ReactantEP, reactant_inputs, compile_reactant
 """
     reactant_inputs(problem; backend=nothing)
 
-Transfer a conservative array-state problem's parameters, model state, batch, and
-initial state to Reactant device arrays. Loading Reactant and Enzyme activates this
-function. Select `backend="cpu"`, `"gpu"`, or `"tpu"` before transfer when desired.
+Transfer a conservative problem's parameters, model state, batch, and initial state
+to Reactant device values. Array states and Functors-compatible trees of numeric
+arrays are supported. Loading Reactant and Enzyme activates this function. Select
+`backend="cpu"`, `"gpu"`, or `"tpu"` before transfer when desired.
 """
 function reactant_inputs end
 
 """
     compile_reactant(problem, algorithm::ReactantEP; backend=nothing, kwargs...)
+    compile_reactant(problem, algorithm::EPAlgorithm; backend=nothing,
+                     learning_rate=nothing, kwargs...)
+    compile_reactant(problem, algorithm::Union{AsymEP,DyadicEP};
+                     backend=nothing, kwargs...)
+    compile_reactant(problem, algorithm, optimizer; backend=nothing, kwargs...)
 
 Compile fixed-step batched EP relaxation and EnzymeMLIR gradient extraction through
 Reactant/OpenXLA. Returns a reusable executable that owns its initial device buffers
 and also accepts same-shaped device parameters, model state, batch, and initial state.
 Loading Reactant and Enzyme activates this function.
+
+Ordinary conservative `EPAlgorithm` values using `Relaxation`, and non-conservative
+`AsymEP` and `DyadicEP` algorithms, have compiled paths as well. When Optimisers.jl
+is loaded, pass an optimizer rule such as `Optimisers.Adam(1f-3)` as the third
+argument to compile its state initialization and update. This form also supports
+`ContinuousEP`.
 """
 function compile_reactant end
 

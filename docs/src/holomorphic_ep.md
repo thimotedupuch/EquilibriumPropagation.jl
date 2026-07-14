@@ -1,7 +1,7 @@
 # Holomorphic EP
 
 Holomorphic equilibrium propagation replaces a small real finite difference with a
-finite-radius contour in the complex nudging plane. If the augmented energy and its
+finite-radius contour in the complex nudging plane. If the total energy ``F_\beta`` and its
 equilibrium branch are holomorphic inside that contour, the exact objective gradient
 is the first Fourier coefficient of the phase-wise parameter derivative.
 
@@ -40,7 +40,7 @@ and estimates
 ```math
 \nabla_\theta\mathcal L =
 \frac{1}{Nr}\sum_{k=0}^{N-1}
-\partial_\theta F(\theta,s^*_{\beta_k},\beta_k)
+\partial_\theta F_{\beta_k}(s^*_{\beta_k};\theta)
 \exp(-2\pi\mathrm{i}k/N).
 ```
 
