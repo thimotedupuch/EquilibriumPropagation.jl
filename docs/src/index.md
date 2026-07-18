@@ -89,6 +89,26 @@ nudged phases.
 hard-clamped inputs, dense reciprocal couplings, biases, optional recurrent
 connections, configurable neuron potentials, and structured parameter trees.
 
+[`AdjacencyHopfield`](@ref) constructs a non-layered network directly from a binary
+adjacency matrix:
+
+```julia
+adjacency = Bool[
+    0 0 1 0 0
+    0 0 0 1 0
+    1 0 0 1 0
+    0 1 1 0 1
+    0 0 0 1 0
+]
+
+network = AdjacencyHopfield(adjacency; input_size=2, output_size=1)
+model, parameters = EquilibriumPropagation.setup(rng, network)
+```
+
+The first two neurons are hard-clamped inputs, the remaining three are dynamical,
+and the final dynamical neuron is the readout. The adjacency matrix must already be
+binary, symmetric, and zero-diagonal; the builder performs no graph processing.
+
 The optional Lux extension supports two complementary boundaries:
 
 - [`lux_energy_model`](@ref) incorporates a Lux layer into a conservative scalar

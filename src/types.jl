@@ -447,13 +447,16 @@ struct HolomorphicEPStats{P,L,G,I,D}
 end
 
 """
-    ReactantEP(protocol; dt=0.1, free_steps=100, nudged_steps=50,
-               abstol=0, reltol=0, learning_rate=nothing)
+    ReactantEP(protocol; method=:euler, dt=0.1, free_steps=100, nudged_steps=50,
+               abstol=0, reltol=0, damping=1e-4, step_scale=1,
+               learning_rate=nothing)
 
 Static-shape equilibrium-propagation algorithm intended for OpenXLA compilation by
-the optional Reactant extension. Every phase executes its configured number of Euler
-steps. Nonzero tolerances enable device-side masked early stopping: the compiled
-program retains its static control flow, but a converged state is no longer updated.
+the optional Reactant extension. `method` may be `:euler`, `:rk4`, or `:newton`; all
+three lower the complete bounded solve to OpenXLA. Newton uses a dense damped Hessian
+and currently requires an array-valued state. Nonzero tolerances enable device-side
+early stopping: the compiled program retains its static control flow, but a converged
+state is no longer updated.
 `protocol` may be [`OneSidedEP`](@ref), [`SymmetricEP`](@ref), or
 [`HolomorphicEP`](@ref).
 
@@ -461,36 +464,47 @@ When `learning_rate` is provided, the compiled kernel additionally returns one
 plain-SGD parameter update. The phase solve and EnzymeMLIR gradients remain the main
 accelerated workload.
 """
-struct ReactantEP{P,T,A,R,L}
+struct ReactantEP{P,M,T,A,R,D,S,L}
     protocol::P
+    method::M
     dt::T
     free_steps::Int
     nudged_steps::Int
     abstol::A
     reltol::R
+    damping::D
+    step_scale::S
     learning_rate::L
 end
 
 function ReactantEP(
     protocol::Union{OneSidedEP,SymmetricEP,HolomorphicEP};
+    method=:euler,
     dt=0.1,
     free_steps=100,
     nudged_steps=50,
     abstol=zero(dt),
     reltol=zero(dt),
+    damping=convert(typeof(dt), 1e-4),
+    step_scale=one(dt),
     learning_rate=nothing,
 )
+    method in (:euler, :rk4, :newton) || throw(ArgumentError(
+        "method must be :euler, :rk4, or :newton",
+    ))
     dt > zero(dt) || throw(ArgumentError("dt must be positive"))
     free_steps >= 0 || throw(ArgumentError("free_steps must be nonnegative"))
     nudged_steps >= 0 || throw(ArgumentError("nudged_steps must be nonnegative"))
     _check_tolerances(abstol, reltol)
+    damping >= zero(damping) || throw(ArgumentError("damping must be nonnegative"))
+    step_scale > zero(step_scale) || throw(ArgumentError("step_scale must be positive"))
     if learning_rate !== nothing
         learning_rate >= zero(learning_rate) || throw(ArgumentError(
             "learning_rate must be nonnegative",
         ))
     end
     return ReactantEP(
-        protocol, dt, Int(free_steps), Int(nudged_steps), abstol, reltol,
-        learning_rate,
+        protocol, method, dt, Int(free_steps), Int(nudged_steps), abstol, reltol,
+        damping, step_scale, learning_rate,
     )
 end

@@ -112,9 +112,72 @@
     )
     @test updated_parameters.weights != ep_parameters.weights
 
+    adjacency = Bool[
+        0 0 1 0 0
+        0 0 0 1 0
+        1 0 0 1 0
+        0 1 1 0 1
+        0 0 0 1 0
+    ]
+    graph_specification = AdjacencyHopfield(
+        adjacency;
+        input_size=2,
+        output_size=1,
+        activation=identity,
+        weight_initializer=(rng, rows, columns) -> ones(Float32, rows, columns),
+        bias_initializer=(rng, width) -> zeros(Float32, width),
+    )
+    graph_model, graph_parameters = EquilibriumPropagation.setup(
+        rng, graph_specification,
+    )
+    @test graph_parameters.coupling == Float32.(adjacency)
+    @test graph_parameters.bias == zeros(Float32, 3)
+    @test all(iszero, graph_parameters.coupling[.!adjacency])
+
+    graph_input = Float32[2, 3]
+    graph_state = Float32[5, 7, 11]
+    graph_target = Float32[13]
+    @test initial_state(
+        graph_model, graph_parameters, NamedTuple(), graph_input,
+    ) == zeros(Float32, 3)
+    @test readout(graph_model, graph_state, graph_parameters, NamedTuple()) == Float32[11]
+    all_rates = vcat(graph_input, graph_state)
+    expected_energy = sum(abs2, graph_state) / 2 -
+                      dot(all_rates, Float32.(adjacency) * all_rates) / 2
+    @test energy(
+        graph_model, graph_state, graph_parameters, NamedTuple(), graph_input,
+    ) ≈ expected_energy
+    @test cost(
+        graph_model, graph_state, graph_parameters, NamedTuple(), graph_target,
+    ) ≈ 2
+
+    graph_packed = pack_parameters(graph_specification, graph_parameters)
+    @test unpack_parameters(graph_specification, graph_packed) == graph_parameters
+    graph_problem = EPProblem(
+        graph_model, graph_parameters, NamedTuple(), graph_input, graph_target,
+    )
+    graph_algorithm = EPAlgorithm(
+        OneSidedEP(0.05f0), Relaxation(dt=0.02f0, maxiters=10, abstol=0f0);
+        state_ad=AutoForwardDiff(), parameter_ad=AutoForwardDiff(),
+    )
+    graph_gradient, _ = ep_gradient(graph_problem, graph_algorithm)
+    @test all(iszero, graph_gradient.coupling[.!adjacency])
+
     @test_throws ArgumentError ContinuousHopfield((3,))
     @test_throws ArgumentError ContinuousHopfield((3, 0, 2))
     @test_throws ArgumentError ContinuousHopfield((3, 2); input_clamp=:soft)
+    @test_throws DimensionMismatch AdjacencyHopfield(
+        zeros(Bool, 2, 3); input_size=1, output_size=1,
+    )
+    @test_throws ArgumentError AdjacencyHopfield(
+        [0 2; 2 0]; input_size=1, output_size=1,
+    )
+    @test_throws ArgumentError AdjacencyHopfield(
+        [0 1; 0 0]; input_size=1, output_size=1,
+    )
+    @test_throws ArgumentError AdjacencyHopfield(
+        [1 0; 0 0]; input_size=1, output_size=1,
+    )
     @test_throws DimensionMismatch EquilibriumPropagation.setup(
         rng,
         ContinuousHopfield(

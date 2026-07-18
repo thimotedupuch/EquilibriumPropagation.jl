@@ -174,13 +174,52 @@ The extension keeps a deliberately predictable compilation contract:
   leaves are numeric arrays or tracked numbers;
 - input, target, state, parameter shapes, and tree structures are fixed after
   compilation;
-- each phase has a fixed maximum number of explicit Euler steps, with optional
-  tolerance-based masking; and
+- each phase has a fixed maximum number of Euler, RK4, or damped-Newton steps, with
+  optional tolerance-based masking; and
 - the energy, cost, and model functions must be traceable by Reactant and
   differentiable by EnzymeMLIR.
 
 Terminal residuals and convergence flags reveal whether the maximum step budget was
 sufficient.
+
+For a higher-order compiled solve, select classical fourth-order Runge--Kutta:
+
+```julia
+algorithm = ReactantEP(
+    SymmetricEP(0.1f0); method=:rk4, dt=0.2f0,
+    free_steps=100, nudged_steps=50,
+)
+```
+
+RK4 evaluates the state gradient four times per step but has a substantially larger
+stability region and better trajectory accuracy than Euler. Both methods, including
+their bounded convergence loop, are contained in the reusable OpenXLA executable.
+
+For a dedicated steady-state solve, use dense damped Newton:
+
+```julia
+algorithm = ReactantEP(
+    SymmetricEP(0.1f0);
+    method=:newton,
+    free_steps=20,
+    nudged_steps=10,
+    abstol=1f-6,
+    reltol=1f-6,
+    damping=1f-4,
+    step_scale=1f0,
+)
+```
+
+Newton solves ``(H + \lambda I)\,\Delta = \nabla_s E`` and updates
+``s \leftarrow s - \alpha\Delta``. Enzyme constructs the dense state Hessian and
+Reactant lowers the factorization and bounded convergence loop to OpenXLA. Damping
+regularizes singular or poorly conditioned Hessians; `step_scale` can be reduced below
+one when full Newton steps are too aggressive.
+
+Dense Newton currently requires an array-valued state and uses quadratic memory in
+the number of state elements. It is intended for modest states; Euler and RK4 remain
+the appropriate compiled methods for large states until a matrix-free Krylov method
+is available.
 
 Two package workflows cannot currently be enclosed safely:
 

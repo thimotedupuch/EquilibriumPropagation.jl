@@ -103,7 +103,8 @@ end
 function Base.show(io::IO, algorithm::ReactantEP)
     print(io, "ReactantEP(")
     _show_compact(io, algorithm.protocol)
-    print(io, "; dt=")
+    algorithm.method === :euler ? print(io, "; dt=") :
+        print(io, "; method=:", algorithm.method, ", dt=")
     _show_compact(io, algorithm.dt)
     print(io, ", free_steps=", algorithm.free_steps,
           ", nudged_steps=", algorithm.nudged_steps)
@@ -112,6 +113,12 @@ function Base.show(io::IO, algorithm::ReactantEP)
         _show_compact(io, algorithm.abstol)
         print(io, ", reltol=")
         _show_compact(io, algorithm.reltol)
+    end
+    if algorithm.method === :newton
+        print(io, ", damping=")
+        _show_compact(io, algorithm.damping)
+        print(io, ", step_scale=")
+        _show_compact(io, algorithm.step_scale)
     end
     print(io, ", learning_rate=")
     _show_compact(io, algorithm.learning_rate)

@@ -4,7 +4,7 @@ import CommonSolve
 import ADTypes
 using DifferentiationInterface: check_available, gradient, jacobian, prepare_gradient
 using Functors: fleaves, fmap
-using LinearAlgebra: Diagonal, diag, dot
+using LinearAlgebra: Diagonal, diag, dot, issymmetric
 
 include("types.jl")
 include("model_interface.jl")
@@ -28,7 +28,8 @@ export ContinuousEP, ContinuousEPStats, continuous_ep, continuous_train_step!
 export AsymEP, DyadicEP, NonConservativeStats
 export HolomorphicEPStats
 export energy, vector_field, cost, readout, initial_state, augmented_energy
-export ContinuousHopfield, QuadraticPotential, HardClamp, BipolarSquaredError
+export ContinuousHopfield, AdjacencyHopfield, QuadraticPotential, HardClamp
+export BipolarSquaredError
 export ZeroState, GlorotUniform, setup, pack_parameters, unpack_parameters
 export equilibrate, solve_phases, ep_gradient, predict
 export apply_gradient!, train_step!

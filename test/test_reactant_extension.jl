@@ -90,6 +90,26 @@ reactant_field_initial(ps, x, st) = zero(ps)
     @test Int(result.free_iterations) == compiled_algorithm.free_steps
     @test Bool(result.converged) == false
 
+    rk4_algorithm = ReactantEP(
+        OneSidedEP(0.1f0); method=:rk4, dt=0.5f0, free_steps=8,
+        nudged_steps=6, abstol=1f-5, reltol=1f-5,
+    )
+    rk4_result = compile_reactant(problem, rk4_algorithm; backend="cpu")()
+    @test all(isfinite, Array(rk4_result.free_state))
+    @test Float32(rk4_result.free_residual) < 1f-2
+    @test Int(rk4_result.free_iterations) <= rk4_algorithm.free_steps
+
+    newton_algorithm = ReactantEP(
+        OneSidedEP(0.1f0); method=:newton, free_steps=4, nudged_steps=4,
+        abstol=1f-6, reltol=1f-6, damping=1f-4, step_scale=1f0,
+    )
+    newton_result = compile_reactant(problem, newton_algorithm; backend="cpu")()
+    expected_free = parameters * input
+    @test Array(newton_result.free_state) ≈ expected_free rtol=2f-5 atol=2f-6
+    @test Float32(newton_result.free_residual) < 1f-5
+    @test Int(newton_result.free_iterations) < newton_algorithm.free_steps
+    @test all(isfinite, Array(newton_result.gradient))
+
     tree_parameters = (
         input=Float32[0.2 -0.1; 0.3 0.4; -0.2 0.1],
         readout=Float32[0.1 -0.3 0.2; -0.2 0.2 0.4],

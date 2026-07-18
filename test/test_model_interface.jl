@@ -39,6 +39,9 @@ include("setup.jl")
     @test ReactantEP(SymmetricEP(0.1); dt=0.2, free_steps=3,
                      nudged_steps=4, learning_rate=0.01).free_steps == 3
     @test_throws ArgumentError ReactantEP(OneSidedEP(0.1); dt=0.0)
+    @test_throws ArgumentError ReactantEP(OneSidedEP(0.1); method=:bogus)
+    @test_throws ArgumentError ReactantEP(OneSidedEP(0.1); damping=-1e-4)
+    @test_throws ArgumentError ReactantEP(OneSidedEP(0.1); step_scale=0.0)
     @test_throws ArgumentError ReactantEP(OneSidedEP(0.1); free_steps=-1)
     @test_throws ArgumentError ReactantEP(OneSidedEP(0.1); nudged_steps=-1)
     @test_throws ArgumentError ReactantEP(OneSidedEP(0.1); abstol=-1)

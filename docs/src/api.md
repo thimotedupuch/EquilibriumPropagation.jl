@@ -24,6 +24,7 @@ lux_dynamical_model
 
 ```@docs
 ContinuousHopfield
+AdjacencyHopfield
 setup
 QuadraticPotential
 HardClamp

@@ -14,6 +14,73 @@ function (::BipolarSquaredError)(output, target)
     return sum((output .- target) .^ 2) / (2 * batch_size)
 end
 
+"""
+    AdjacencyHopfield(adjacency; input_size, output_size, kwargs...)
+
+Continuous Hopfield network with user-specified connectivity. `adjacency` is a binary,
+symmetric, zero-diagonal matrix over all neurons. The first `input_size` neurons are
+hard-clamped inputs; all remaining neurons form one dynamical state, and its last
+`output_size` neurons are the readout. The matrix is used as supplied: no graph
+construction, traversal, or topology inference is performed.
+"""
+struct AdjacencyHopfield{M,A,P,I,O,B,SI,WI,BI}
+    adjacency::M
+    input_size::Int
+    output_size::Int
+    activation::A
+    potential::P
+    input_clamp::I
+    output_cost::O
+    bias::B
+    state_initializer::SI
+    weight_initializer::WI
+    bias_initializer::BI
+end
+
+function AdjacencyHopfield(
+    adjacency::AbstractMatrix;
+    input_size,
+    output_size,
+    activation=tanh,
+    potential=QuadraticPotential(),
+    input_clamp=HardClamp(),
+    output_cost=BipolarSquaredError(),
+    bias=true,
+    state_initializer=ZeroState(),
+    weight_initializer=GlorotUniform(),
+    bias_initializer=ZeroBias(),
+)
+    size(adjacency, 1) == size(adjacency, 2) || throw(DimensionMismatch(
+        "adjacency must be square",
+    ))
+    all(value -> value == 0 || value == 1, adjacency) || throw(ArgumentError(
+        "adjacency must contain only binary values 0 and 1",
+    ))
+    issymmetric(adjacency) || throw(ArgumentError("adjacency must be symmetric"))
+    all(iszero, diag(adjacency)) || throw(ArgumentError(
+        "adjacency diagonal must be zero",
+    ))
+    input_size isa Integer && input_size > 0 || throw(ArgumentError(
+        "input_size must be a positive integer",
+    ))
+    dynamic_size = size(adjacency, 1) - input_size
+    dynamic_size > 0 || throw(ArgumentError(
+        "adjacency must include at least one dynamical neuron after the inputs",
+    ))
+    output_size isa Integer && 0 < output_size <= dynamic_size || throw(ArgumentError(
+        "output_size must be between 1 and the number of dynamical neurons",
+    ))
+    input_clamp isa HardClamp || throw(ArgumentError(
+        "only HardClamp() is currently supported",
+    ))
+    bias isa Bool || throw(ArgumentError("bias must be true or false"))
+    return AdjacencyHopfield(
+        copy(adjacency), Int(input_size), Int(output_size), activation, potential,
+        input_clamp, output_cost, bias, state_initializer, weight_initializer,
+        bias_initializer,
+    )
+end
+
 """Default zero-valued dynamical-state initializer."""
 struct ZeroState end
 
@@ -110,6 +177,11 @@ function ContinuousHopfield(
 end
 
 _dynamic_sizes(spec::ContinuousHopfield) = Base.tail(spec.layer_sizes)
+_dynamic_sizes(spec::AdjacencyHopfield) = (size(spec.adjacency, 1) - spec.input_size,)
+_input_width(spec::ContinuousHopfield) = spec.layer_sizes[1]
+_input_width(spec::AdjacencyHopfield) = spec.input_size
+_output_width(spec::ContinuousHopfield) = spec.layer_sizes[end]
+_output_width(spec::AdjacencyHopfield) = spec.output_size
 
 function _check_feature_shape(value, width, name)
     ndims(value) in (1, 2) || throw(DimensionMismatch(
@@ -172,6 +244,19 @@ function _hopfield_energy(spec, state, parameters, input)
     return value / _batch_size(input)
 end
 
+function _hopfield_energy(spec::AdjacencyHopfield, state, parameters, input)
+    _check_feature_shape(input, spec.input_size, "input")
+    _check_state_shape(spec, state, input)
+    rates = spec.activation.(state)
+    input_rates = spec.activation.(input)
+    all_rates = vcat(input_rates, rates)
+    coupling = parameters.coupling .* spec.adjacency
+    value = sum(spec.potential, state)
+    value -= sum(all_rates .* (coupling * all_rates)) / 2
+    spec.bias && (value -= _bias_term(parameters.bias, rates))
+    return value / _batch_size(input)
+end
+
 function _hopfield_cost(spec, state, target)
     layers = _layer_views(spec, state)
     output = layers[end]
@@ -187,8 +272,28 @@ function _hopfield_cost(spec, state, target)
     return result
 end
 
+function _adjacency_output(spec::AdjacencyHopfield, state)
+    first = size(state, 1) - spec.output_size + 1
+    return ndims(state) == 1 ? view(state, first:size(state, 1)) :
+           view(state, first:size(state, 1), :)
+end
+
+function _hopfield_cost(spec::AdjacencyHopfield, state, target)
+    output = _adjacency_output(spec, state)
+    _check_feature_shape(target, spec.output_size, "target")
+    ndims(output) == ndims(target) || throw(DimensionMismatch(
+        "output and target must both be vectors or both be matrices",
+    ))
+    _batch_size(output) == _batch_size(target) || throw(DimensionMismatch(
+        "output and target batch sizes must match",
+    ))
+    result = spec.output_cost(output, target)
+    result isa Number || throw(ArgumentError("output_cost must return a scalar"))
+    return result
+end
+
 function _zero_state(spec, parameters, input)
-    _check_feature_shape(input, spec.layer_sizes[1], "input")
+    _check_feature_shape(input, _input_width(spec), "input")
     dimensions = ndims(input) == 1 ?
         (sum(_dynamic_sizes(spec)),) :
         (sum(_dynamic_sizes(spec)), size(input, 2))
@@ -226,6 +331,12 @@ function (callable::HopfieldReadout)(state, parameters, model_state)
     return _layer_views(callable.specification, state)[end]
 end
 
+function (callable::HopfieldReadout{<:AdjacencyHopfield})(state, parameters, model_state)
+    spec = callable.specification
+    _check_feature_shape(state, only(_dynamic_sizes(spec)), "state")
+    return _adjacency_output(spec, state)
+end
+
 struct HopfieldInitialState{S}
     specification::S
 end
@@ -250,8 +361,8 @@ function EPProblem(
     target,
 )
     spec = model.energy.specification
-    _check_feature_shape(input, spec.layer_sizes[1], "input")
-    _check_feature_shape(target, spec.layer_sizes[end], "target")
+    _check_feature_shape(input, _input_width(spec), "input")
+    _check_feature_shape(target, _output_width(spec), "target")
     ndims(input) == ndims(target) || throw(DimensionMismatch(
         "input and target must both be vectors or both be matrices",
     ))
@@ -313,6 +424,31 @@ function setup(rng, spec::ContinuousHopfield)
     return _hopfield_model(spec), parameters
 end
 
+"""
+    setup(rng, specification::AdjacencyHopfield) -> model, parameters
+
+Initialize an adjacency-masked continuous Hopfield network. Parameters contain one
+symmetric `coupling` matrix and, when enabled, a dynamical-state `bias` vector.
+Entries excluded by the adjacency matrix are initialized to and remain at zero.
+"""
+function setup(rng, spec::AdjacencyHopfield)
+    total_size = size(spec.adjacency, 1)
+    dynamic_size = only(_dynamic_sizes(spec))
+    raw = spec.weight_initializer(rng, total_size, total_size)
+    size(raw) == size(spec.adjacency) || throw(DimensionMismatch(
+        "weight initializer returned size $(size(raw)); expected $(size(spec.adjacency))",
+    ))
+    symmetric = (raw .+ transpose(raw)) ./ 2
+    coupling = symmetric .* spec.adjacency
+    bias = spec.bias ? spec.bias_initializer(rng, dynamic_size) : ()
+    if spec.bias
+        size(bias) == (dynamic_size,) || throw(DimensionMismatch(
+            "bias initializer returned size $(size(bias)); expected $((dynamic_size,))",
+        ))
+    end
+    return _hopfield_model(spec), (coupling=coupling, bias=bias)
+end
+
 """Flatten a continuous Hopfield named parameter tree into one vector."""
 function pack_parameters(spec::ContinuousHopfield, parameters)
     leaves = (parameters.weights..., parameters.biases..., parameters.recurrent...)
@@ -348,4 +484,24 @@ function unpack_parameters(spec::ContinuousHopfield, packed::AbstractVector)
     recurrent = spec.recurrent ?
         ntuple(i -> take_matrix(sizes[i + 1], sizes[i + 1]), length(sizes) - 1) : ()
     return (weights=weights, biases=biases, recurrent=recurrent)
+end
+
+"""Flatten adjacency-Hopfield parameters into one vector."""
+function pack_parameters(spec::AdjacencyHopfield, parameters)
+    leaves = spec.bias ? (parameters.coupling, parameters.bias) : (parameters.coupling,)
+    return reduce(vcat, map(vec, leaves))
+end
+
+"""Rebuild adjacency-Hopfield parameters from one flat vector."""
+function unpack_parameters(spec::AdjacencyHopfield, packed::AbstractVector)
+    total_size = size(spec.adjacency, 1)
+    dynamic_size = only(_dynamic_sizes(spec))
+    coupling_count = total_size^2
+    expected = coupling_count + (spec.bias ? dynamic_size : 0)
+    length(packed) == expected || throw(DimensionMismatch(
+        "packed parameters have length $(length(packed)); expected $expected",
+    ))
+    coupling = reshape(copy(view(packed, 1:coupling_count)), total_size, total_size)
+    bias = spec.bias ? copy(view(packed, (coupling_count + 1):expected)) : ()
+    return (coupling=coupling, bias=bias)
 end

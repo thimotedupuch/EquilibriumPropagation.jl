@@ -1,6 +1,7 @@
 module EquilibriumPropagationReactantExt
 
 using EquilibriumPropagation
+using LinearAlgebra
 import Enzyme
 import Reactant
 
@@ -106,43 +107,115 @@ function _compiled_relax(
     steps,
     abstol,
     reltol,
+    method=:euler,
+    damping=zero(dt),
+    step_scale=one(dt),
 )
+    if method === :newton && !(state isa AbstractArray)
+        throw(ArgumentError("compiled Newton relaxation requires an array-valued state"))
+    end
+    # Dense factorizations may donate their buffers. Each phase must retain the state
+    # supplied by the preceding phase for EP's gradient difference and diagnostics.
+    state = method === :newton ? copy(state) : state
     derivative = _compiled_state_gradient(
         state, model, parameters, model_state, batch, β,
     )
     initial_residual = _compiled_tree_norm(derivative)
     tolerance = abstol + reltol * initial_residual
-    iterations = zero(steps)
+    # Seed an independent loop-carried scalar. `zero(steps)` can alias a tracked
+    # step-budget buffer when multiple phases use the same budget.
+    iterations = 0
     use_tolerance = !iszero(abstol) || !iszero(reltol)
     if use_tolerance
         residual = initial_residual
         Reactant.@trace while (iterations < steps) & (residual > tolerance)
-            state = EquilibriumPropagation.fmap(
-                (value, gradient) -> value .- dt .* gradient,
-                state, derivative,
+            state, derivative = _compiled_energy_step(
+                state, derivative, model, parameters, model_state, batch, β, dt,
+                method, damping, step_scale,
             )
             iterations += 1
-            derivative = _compiled_state_gradient(
-                state, model, parameters, model_state, batch, β,
-            )
             residual = _compiled_tree_norm(derivative)
         end
     else
         for _ in 1:steps
-            state = EquilibriumPropagation.fmap(
-                (value, gradient) -> value .- dt .* gradient,
-                state, derivative,
+            state, derivative = _compiled_energy_step(
+                state, derivative, model, parameters, model_state, batch, β, dt,
+                method, damping, step_scale,
             )
             iterations += 1
-            derivative = _compiled_state_gradient(
-                state, model, parameters, model_state, batch, β,
-            )
         end
     end
     residual = _compiled_tree_norm(derivative)
     converged = use_tolerance ? residual <= tolerance : false
     return (state=state, residual=residual, iterations=iterations,
             converged=converged)
+end
+
+function _compiled_energy_step(
+    state, derivative, model, parameters, model_state, batch, β, dt, method,
+    damping, step_scale,
+)
+    if method === :euler
+        state = EquilibriumPropagation.fmap(
+            (value, gradient) -> value .- dt .* gradient, state, derivative,
+        )
+    elseif method === :rk4
+        k1 = EquilibriumPropagation.fmap(gradient -> .-gradient, derivative)
+        stage = EquilibriumPropagation.fmap(
+            (value, slope) -> value .+ (dt / 2) .* slope, state, k1,
+        )
+        k2 = EquilibriumPropagation.fmap(
+            gradient -> .-gradient,
+            _compiled_state_gradient(stage, model, parameters, model_state, batch, β),
+        )
+        stage = EquilibriumPropagation.fmap(
+            (value, slope) -> value .+ (dt / 2) .* slope, state, k2,
+        )
+        k3 = EquilibriumPropagation.fmap(
+            gradient -> .-gradient,
+            _compiled_state_gradient(stage, model, parameters, model_state, batch, β),
+        )
+        stage = EquilibriumPropagation.fmap(
+            (value, slope) -> value .+ dt .* slope, state, k3,
+        )
+        k4 = EquilibriumPropagation.fmap(
+            gradient -> .-gradient,
+            _compiled_state_gradient(stage, model, parameters, model_state, batch, β),
+        )
+        weighted = EquilibriumPropagation.fmap((a, b) -> a .+ 2 .* b, k1, k2)
+        weighted = EquilibriumPropagation.fmap((a, b) -> a .+ 2 .* b, weighted, k3)
+        weighted = EquilibriumPropagation.fmap((a, b) -> a .+ b, weighted, k4)
+        state = EquilibriumPropagation.fmap(
+            (value, slope) -> value .+ (dt / 6) .* slope, state, weighted,
+        )
+    else
+        hessian = _compiled_state_hessian(
+            state, model, parameters, model_state, batch, β,
+        )
+        step = (hessian + damping * I) \ copy(vec(derivative))
+        state = state .- step_scale .* reshape(step, size(state))
+    end
+    derivative = _compiled_state_gradient(
+        state, model, parameters, model_state, batch, β,
+    )
+    return state, derivative
+end
+
+function _compiled_state_hessian(state, model, parameters, model_state, batch, β)
+    columns = map(Enzyme.onehot(state)) do direction
+        tangent = Enzyme.autodiff(
+            Enzyme.Forward,
+            _compiled_state_gradient,
+            Enzyme.Duplicated(state, direction),
+            Enzyme.Const(model),
+            Enzyme.Const(parameters),
+            Enzyme.Const(model_state),
+            Enzyme.Const(batch),
+            Enzyme.Const(β),
+        )[1]
+        return vec(tangent)
+    end
+    return reduce(hcat, columns)
 end
 
 function _compiled_gradient_difference(first, second, scale)
@@ -384,6 +457,9 @@ function (kernel::ReactantEPKernel)(parameters, model_state, batch, initial_stat
         algorithm.free_steps,
         algorithm.abstol,
         algorithm.reltol,
+        algorithm.method,
+        algorithm.damping,
+        algorithm.step_scale,
     )
     free_state = free.state
     positive = _compiled_relax(
@@ -397,6 +473,9 @@ function (kernel::ReactantEPKernel)(parameters, model_state, batch, initial_stat
         algorithm.nudged_steps,
         algorithm.abstol,
         algorithm.reltol,
+        algorithm.method,
+        algorithm.damping,
+        algorithm.step_scale,
     )
     positive_state = positive.state
     positive_gradient = _compiled_parameter_gradient(
@@ -411,8 +490,10 @@ function (kernel::ReactantEPKernel)(parameters, model_state, batch, initial_stat
             positive_gradient, free_gradient, protocol.β,
         )
         negative_state = free_state
-        negative_residual = zero(free.residual)
-        negative_iterations = zero(free.iterations)
+        # Use independent constants: `zero` of a traced result may reuse its scalar
+        # buffer and clobber the corresponding free-phase diagnostic under donation.
+        negative_residual = zero(algorithm.dt)
+        negative_iterations = 0
         negative_converged = true
     else
         negative = _compiled_relax(
@@ -426,6 +507,9 @@ function (kernel::ReactantEPKernel)(parameters, model_state, batch, initial_stat
             algorithm.nudged_steps,
             algorithm.abstol,
             algorithm.reltol,
+            algorithm.method,
+            algorithm.damping,
+            algorithm.step_scale,
         )
         negative_state = negative.state
         negative_gradient = _compiled_parameter_gradient(
