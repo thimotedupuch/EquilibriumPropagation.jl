@@ -1,42 +1,83 @@
 # Continuous Hopfield example
 
-The repository includes `examples/continuous_hopfield_spiral.jl`, a complete
-two-class training example.
+This example trains a small continuous Hopfield network on two spirals. It is the
+simplest complete classification example in the repository.
 
-The example declares a `ContinuousHopfield((2, hidden, 2))` specification and calls
-`setup` to obtain an ordinary `EPModel` and named parameter tree. The dynamical state
-contains hidden and output neurons. Its conservative energy combines quadratic neuron
-potentials with tanh firing rates, input drive, hidden–output coupling, and biases.
-Because all interactions appear in one scalar energy, state dynamics are obtained
-directly from its gradient. Bipolar output targets provide the supervised nudging cost.
+## 1. Load the packages and data
 
-## Run it
+The example file contains `spiral_dataset`, which returns inputs, bipolar targets,
+and integer labels.
 
-From the repository root:
+```julia
+using ADTypes: AutoForwardDiff
+using EquilibriumPropagation
+using ForwardDiff
+using Optimisers
+using Random
 
-```bash
-julia --project=examples -e 'using Pkg; Pkg.instantiate()'
-julia --project=examples examples/continuous_hopfield_spiral.jl
+include("examples/continuous_hopfield_spiral.jl")
+
+rng = Xoshiro(7)
+inputs, targets, labels = spiral_dataset(rng, 400)
 ```
 
-The default run generates 400 noisy points, trains a 2–32–2 network with symmetric EP,
-and reports loss, accuracy, free-phase residual, and whether every training phase in
-the epoch converged.
+Each column is one observation. `inputs` and `targets` both have two rows.
 
-Command-line options use `--name=value` syntax:
+## 2. Build the model
+
+```julia
+network = ContinuousHopfield(
+    (2, 32, 2);
+    activation=tanh,
+    output_cost=BipolarSquaredError(),
+)
+
+model, parameters = EquilibriumPropagation.setup(rng, network)
+```
+
+The input is clamped. The hidden and output neurons relax to an equilibrium.
+
+## 3. Choose EP and an optimizer
+
+```julia
+backend = AutoForwardDiff()
+algorithm = EPAlgorithm(
+    SymmetricEP(0.15f0),
+    Relaxation(dt=7f0, maxiters=50, abstol=5f-4);
+    state_ad=backend,
+    parameter_ad=backend,
+)
+
+optimizer_state = Optimisers.setup(Optimisers.Adam(1f-2), parameters)
+```
+
+The energy is averaged over a batch of 20. The larger `dt` offsets that averaging.
+
+## 4. Train on one batch
+
+```julia
+columns = 1:20
+batch = (inputs[:, columns], targets[:, columns])
+
+optimizer_state, parameters, stats = train_step!(
+    optimizer_state,
+    parameters,
+    model,
+    batch,
+    algorithm,
+)
+
+@assert stats.converged
+```
+
+Put this call inside an epoch and minibatch loop to train the full dataset. The
+repository script already does that.
+
+## Run the complete script
 
 ```bash
 julia --project=examples examples/continuous_hopfield_spiral.jl \
-    --epochs=50 --points=400 --batch-size=20 --hidden=48 --seed=11
+    --epochs=30 --points=400 --batch-size=20
 ```
 
-`points` must be even and divisible by `batch-size`. The script returns the trained
-model, named parameter tree, data, labels, and final accuracy when `train_spiral` is
-called programmatically.
-
-## Why the step scales with batch size
-
-Both energy and cost are means over the minibatch. Their gradient with respect to each
-neuron therefore contains a factor of `1 / batch_size`. The example scales the Euler
-step by `batch_size`, keeping the effective per-neuron relaxation step unchanged when
-the batch size changes.
+It prints loss, accuracy, residual, and convergence while it trains.

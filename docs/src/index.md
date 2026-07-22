@@ -1,157 +1,64 @@
 # EquilibriumPropagation.jl
 
-EquilibriumPropagation.jl is a composable Julia toolkit for training equilibrium
-models with equilibrium propagation (EP). It covers conservative energy-based
-networks, non-conservative dynamical systems, continual parameter updates, and
-holomorphic finite-radius estimators. Models are ordinary Julia functions, while
-solvers, differentiation backends, learning protocols, and optimizer updates remain
-explicit and independently configurable.
+EquilibriumPropagation.jl is a small Julia toolkit for equilibrium propagation.
 
-The package supports small research models as well as compiled accelerator workflows.
-Reactant can lower complete fixed-shape training steps—including equilibrium
-relaxation, EnzymeMLIR differentiation, phase contrasts, convergence loops, and
-Optimisers.jl state updates—to OpenXLA for CPU, GPU, and TPU execution.
+- Build energy-based models or provide your own dynamics.
+- Choose classical, continuous, holomorphic, or non-conservative EP.
+- Train with Optimisers.jl and compile fixed-shape workloads with Reactant.
 
-## Core workflow
-
-A conservative model supplies an internal energy ``E``, supervised cost ``C``,
-readout, and initial state. For nudging strength ``\beta``, EP relaxes the total
-energy
-
-```math
-F_\beta(s;\theta,x,y)
-= E(s;\theta,x) + \beta C(s,y;\theta),
-```
-
-then constructs a parameter update from derivatives evaluated at free and nudged
-equilibria. The equilibrium states are treated as constants during parameter
-differentiation: EP does not backpropagate through the relaxation trajectory.
+## Minimum working example
 
 ```julia
 using ADTypes: AutoForwardDiff
 using EquilibriumPropagation
 using ForwardDiff
+using Random
 
+rng = Xoshiro(1)
+model, parameters = EquilibriumPropagation.setup(
+    rng,
+    ContinuousHopfield((2, 3, 1)),
+)
+
+problem = EPProblem(
+    model,
+    parameters,
+    NamedTuple(),
+    Float32[0.2, -0.1],
+    Float32[0.5],
+)
+
+backend = AutoForwardDiff()
 algorithm = EPAlgorithm(
     SymmetricEP(0.05f0),
-    Relaxation(dt=0.2f0, maxiters=100, abstol=1f-5);
-    state_ad=AutoForwardDiff(),
-    parameter_ad=AutoForwardDiff(),
+    Relaxation(dt=0.2f0, maxiters=500, abstol=1f-5);
+    state_ad=backend,
+    parameter_ad=backend,
 )
 
 gradient, stats = ep_gradient(problem, algorithm)
 ```
 
-[`EPStats`](@ref) reports loss, residuals, iteration counts, phase energies,
-convergence, gradient norm, and phase displacement so numerical accuracy remains
-visible to training code.
+That is the full EP workflow. `gradient` matches the parameter tree. Check
+`stats.converged` before using it.
 
-## Learning protocols
+## Update the model
 
-The conservative [`EPModel`](@ref) interface supports:
-
-- [`OneSidedEP`](@ref), contrasting a positive nudged equilibrium with the free
-  equilibrium;
-- [`SymmetricEP`](@ref), using opposite nudges to cancel the leading finite-``\beta``
-  error;
-- [`HolomorphicEP`](@ref), extracting the objective gradient from equilibria sampled
-  around a complex nudging contour; and
-- [`ContinuousEP`](@ref), alternating nudged state evolution with local parameter
-  updates throughout the learning phase.
-
-For dynamics that do not derive from a scalar energy, [`DynamicalModel`](@ref)
-supports:
-
-- [`AsymEP`](@ref), which corrects nudged dynamics using the antisymmetric part of the
-  free-state Jacobian; and
-- [`DyadicEP`](@ref), which evolves midpoint and adjoint-like difference states.
-
-These interfaces make reciprocal energy-based networks and directed or asymmetric
-equilibrium systems available through the same problem, diagnostics, and optimizer
-conventions.
-
-## Equilibrium solvers
-
-The built-in [`Relaxation`](@ref) solver provides explicit gradient-flow steps with
-absolute and relative convergence tolerances. Optional extensions add:
-
-- [`ODERelaxation`](@ref) with explicit or stiff OrdinaryDiffEq integrators;
-- [`SteadyStateRelaxation`](@ref) through SteadyStateDiffEq; and
-- [`RootRelaxation`](@ref) through NonlinearSolve.
-
-Free, positive, and negative phases may use independent solver configurations. This
-is useful when a precise free equilibrium needs a larger budget than warm-started
-nudged phases.
-
-## Models and ecosystem integration
-
-[`ContinuousHopfield`](@ref) constructs multilayer continuous Hopfield networks with
-hard-clamped inputs, dense reciprocal couplings, biases, optional recurrent
-connections, configurable neuron potentials, and structured parameter trees.
-
-[`AdjacencyHopfield`](@ref) constructs a non-layered network directly from a binary
-adjacency matrix:
+Optimisers.jl adds a one-call training step:
 
 ```julia
-adjacency = Bool[
-    0 0 1 0 0
-    0 0 0 1 0
-    1 0 0 1 0
-    0 1 1 0 1
-    0 0 0 1 0
-]
+using Optimisers
 
-network = AdjacencyHopfield(adjacency; input_size=2, output_size=1)
-model, parameters = EquilibriumPropagation.setup(rng, network)
+optimizer = Optimisers.setup(Optimisers.Adam(1f-3), parameters)
+optimizer, parameters, stats = train_step!(
+    optimizer,
+    parameters,
+    model,
+    (problem.input, problem.target),
+    algorithm,
+)
 ```
 
-The first two neurons are hard-clamped inputs, the remaining three are dynamical,
-and the final dynamical neuron is the readout. The adjacency matrix must already be
-binary, symmetric, and zero-diagonal; the builder performs no graph processing.
-
-The optional Lux extension supports two complementary boundaries:
-
-- [`lux_energy_model`](@ref) incorporates a Lux layer into a conservative scalar
-  energy; and
-- [`lux_dynamical_model`](@ref) uses a Lux layer to define an arbitrary vector field
-  for AsymEP or Dyadic EP.
-
-Lux parameters retain their native tree structure. Non-trainable model state is kept
-explicit and fixed during equilibrium relaxation.
-
-Loading Optimisers.jl activates [`train_step!`](@ref) and
-[`continuous_train_step!`](@ref). Descent, momentum, Adam, optimizer chains, and
-their state are handled without embedding optimizer policy into the model or EP
-algorithm.
-
-## OpenXLA acceleration
-
-The optional Reactant extension compiles fixed-shape training workloads for
-accelerator execution. Currently compiled paths include:
-
-- one-sided and symmetric conservative EP;
-- tree-valued states and parameters;
-- bounded data-dependent convergence through Reactant `@trace while` loops;
-- Continuous EP with on-device optimizer updates;
-- non-conservative AsymEP and Dyadic EP, including EnzymeMLIR Jacobian operations;
-- general Optimisers.jl state, including Adam moments and counters; and
-- reusable device inputs and parameters without per-minibatch host transfers.
-
-See [OpenXLA acceleration with Reactant](@ref) for the compilation contract and
-[CIFAR-10 with frozen Lux convolutions and a compiled CHN](@ref) for a larger example
-that composes two accelerator executables.
-
-## Examples
-
-The documentation includes complete workflows at several scales:
-
-- [Getting started](@ref) develops a quadratic model and its EP gradient;
-- [Continuous Hopfield example](@ref) trains a nonlinear CHN on interleaved spirals;
-- [MNIST classification example](@ref) trains a ten-class CHN on pooled images;
-- [Feedforward MLP with AsymEP](@ref) trains directed Lux dynamics without a scalar
-  energy; and
-- [CIFAR-10 with frozen Lux convolutions and a compiled CHN](@ref) combines a frozen
-  Reactant-compiled convolutional feature extractor with compiled CHN training.
-
-Continue with [EP concepts](@ref) for the estimator definitions and numerical
-contracts, or go directly to the [API reference](@ref).
+Start with [Getting started](@ref) for the low-level model interface. See the
+[Continuous Hopfield example](@ref) for a training loop. The [API reference](@ref)
+contains the full package.

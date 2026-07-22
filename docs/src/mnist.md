@@ -1,48 +1,79 @@
 # MNIST classification example
 
-The repository includes `examples/mnist_classification.jl`, a compact MNIST
-classifier trained with symmetric equilibrium propagation. It is constructed with
-`ContinuousHopfield((nfeatures, 64, 10); activation=tanh)` by default. Images are
-hard-clamped external inputs; both hidden and class-score neurons form the relaxed
-dynamical state, with reciprocal hidden-output couplings derived from one energy.
+This example changes the spiral classifier in only two places: the data and the
+network size.
 
-To keep ForwardDiff-based parameter gradients practical, the script average-pools
-each 28×28 image to 7×7 by default. It trains on a random 1,000-image subset and
-reports accuracy on 500 test images.
+## 1. Load a small MNIST dataset
 
-## Run it
+```julia
+using ADTypes: AutoForwardDiff
+using EquilibriumPropagation
+using ForwardDiff
+using Optimisers
+using Random
 
-Instantiate the example environment once, then launch the script:
+include("examples/mnist_classification.jl")
+
+inputs, targets, labels, test_inputs, _, test_labels = load_mnist(
+    train_samples=1_000,
+    test_samples=500,
+    pool=4,
+)
+```
+
+Pooling turns each 28×28 image into 49 input values. Each target has ten bipolar
+values: `+1` for the correct digit and `-1` for the others.
+
+## 2. Build the classifier
+
+```julia
+rng = Xoshiro(7)
+network = ContinuousHopfield(
+    (size(inputs, 1), 64, 10);
+    activation=tanh,
+    output_cost=BipolarSquaredError(),
+)
+
+model, parameters = EquilibriumPropagation.setup(rng, network)
+```
+
+## 3. Configure training
+
+```julia
+batch_size = 20
+backend = AutoForwardDiff()
+
+algorithm = EPAlgorithm(
+    SymmetricEP(0.1f0),
+    Relaxation(dt=0.8f0 * batch_size, maxiters=20, abstol=1f-5);
+    state_ad=backend,
+    parameter_ad=backend,
+)
+
+optimizer_state = Optimisers.setup(Optimisers.Adam(1f-2), parameters)
+```
+
+## 4. Update one minibatch
+
+```julia
+columns = 1:batch_size
+optimizer_state, parameters, stats = train_step!(
+    optimizer_state,
+    parameters,
+    model,
+    (inputs[:, columns], targets[:, columns]),
+    algorithm,
+)
+```
+
+Repeat this call for shuffled minibatches. Watch `stats.loss` and
+`stats.converged`.
+
+## Run the complete script
 
 ```bash
-julia --project=examples -e 'using Pkg; Pkg.instantiate()'
 julia --project=examples examples/mnist_classification.jl
 ```
 
-MLDatasets may ask for permission to download MNIST the first time it is used.
-
-The dataset size, pooling, and training duration are configurable:
-
-```bash
-julia --project=examples examples/mnist_classification.jl \
-    --epochs=10 --train-samples=5000 --test-samples=1000 \
-    --batch-size=20 --pool=4 --hidden=64 --seed=11
-```
-
-`--pool=2` retains 14×14 inputs and gives the classifier more spatial detail, at the
-cost of a larger parameter gradient. `--pool=1` uses all 784 pixels.
-
-The example uses a continuous Hopfield energy with a quadratic neuron potential and
-`tanh` rates:
-
-```math
-E(h,o,x;\theta)=\frac{1}{B}\left[
-\frac{1}{2}\left(\lVert h\rVert^2+\lVert o\rVert^2\right)
--\rho(h)^\mathsf{T}W_xx
--\rho(o)^\mathsf{T}W_h\rho(h)
--b_h^\mathsf{T}\rho(h)-b_o^\mathsf{T}\rho(o)\right].
-```
-
-At the free equilibrium, the output population contains the ten class scores. During the
-nudged phases, a bipolar target attracts the correct class score toward `+1` and the
-other scores toward `-1`.
+The defaults are deliberately small. Use `--train-samples`, `--test-samples`,
+`--epochs`, `--hidden`, and `--pool` to scale the experiment.

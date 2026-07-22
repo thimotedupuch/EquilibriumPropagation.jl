@@ -271,6 +271,6 @@ Its other options are `--epochs=12`, `--observations=256`, `--batch-size=32`, an
 `--seed=7`. Substitute `--backend=gpu` or `--backend=tpu` on configured hardware.
 
 For a larger image-classification pipeline, continue with
-[CIFAR-10 with frozen Lux convolutions and a compiled CHN](@ref). It composes a
+[CIFAR-10 with Reactant](@ref). It composes a
 Reactant-compiled Lux feature extractor with compiled CHN relaxation, symmetric EP,
 and Adam while keeping intermediate feature tensors on the accelerator.
